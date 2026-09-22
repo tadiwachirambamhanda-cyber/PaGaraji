@@ -50,6 +50,9 @@ function fromRow(row: ListingRow, verifiedSellerIds: ReadonlySet<string>): Listi
 }
 
 let listings: Listing[] = [];
+// No backend configured means there's nothing to wait for — start "hydrated" so an
+// on-device-only build doesn't get stuck showing a loading state forever.
+let hydrated = supabase === null;
 const listeners = new Set<() => void>();
 
 function emitChange() {
@@ -65,7 +68,11 @@ export async function refreshRemoteListings(): Promise<void> {
     supabase.from('listings').select('*').order('created_at', { ascending: false }).limit(200),
     supabase.from('verified_suppliers').select('user_id'),
   ]);
-  if (listingsResult.error || !listingsResult.data) return;
+  hydrated = true;
+  if (listingsResult.error || !listingsResult.data) {
+    emitChange();
+    return;
+  }
   const verifiedSellerIds = new Set((verifiedResult.data ?? []).map((row) => row.user_id as string));
   listings = (listingsResult.data as ListingRow[]).map((row) => fromRow(row, verifiedSellerIds));
   emitChange();
@@ -87,4 +94,9 @@ function subscribe(listener: () => void) {
 
 export function useRemoteListings() {
   return useSyncExternalStore(subscribe, () => listings);
+}
+
+/** False until the first fetch (success or failure) resolves — use to avoid flashing an empty state. */
+export function useRemoteListingsHydrated() {
+  return useSyncExternalStore(subscribe, () => hydrated);
 }

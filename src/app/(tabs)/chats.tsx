@@ -1,13 +1,18 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { PageHeader } from '@/components/page-header';
 import { Stitch } from '@/components/stitch';
 import { refreshAll } from '@/lib/refresh';
 import { timeAgo } from '@/lib/time';
 import { initialsOf } from '@/store/profile';
-import { refreshConversations, useConversations, type ConversationSummary } from '@/store/conversations';
+import {
+  refreshConversations,
+  useConversations,
+  useConversationsHydrated,
+  type ConversationSummary,
+} from '@/store/conversations';
 import { Colors, Fonts, Spacing, Type } from '@/theme';
 
 function ConversationRow({ item }: { item: ConversationSummary }) {
@@ -44,6 +49,7 @@ function ConversationRow({ item }: { item: ConversationSummary }) {
 
 export default function ChatsScreen() {
   const conversations = useConversations();
+  const hydrated = useConversationsHydrated();
   const unread = conversations.filter((c) => c.unreadCount > 0).length;
   const [refreshing, setRefreshing] = useState(false);
 
@@ -79,10 +85,16 @@ export default function ChatsScreen() {
           </View>
         )}
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>No conversations yet</Text>
-            <Text style={styles.emptyText}>Open a listing and tap Message to start one with the seller.</Text>
-          </View>
+          hydrated ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>No conversations yet</Text>
+              <Text style={styles.emptyText}>Open a listing and tap Message to start one with the seller.</Text>
+            </View>
+          ) : (
+            <View style={styles.loading}>
+              <ActivityIndicator color={Colors.muted} />
+            </View>
+          )
         }
         renderItem={({ item }) => <ConversationRow item={item} />}
       />
@@ -174,6 +186,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
     paddingTop: Spacing.xl,
     gap: Spacing.xs,
+  },
+  loading: {
+    paddingTop: Spacing.xxxl,
   },
   emptyTitle: {
     fontFamily: Fonts.headingBold,

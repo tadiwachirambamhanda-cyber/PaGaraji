@@ -1,18 +1,23 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { ListingCard } from '@/components/listing-card';
 import { refreshAll } from '@/lib/refresh';
 import { useAllListings } from '@/store/my-listings';
+import { useRemoteListingsHydrated } from '@/store/remote-listings';
 import { useSavedIds } from '@/store/saved-listings';
 import { Colors, Fonts, Spacing, Type } from '@/theme';
 
 export default function SavedPartsScreen() {
   const savedIds = useSavedIds();
   const allListings = useAllListings();
+  const hydrated = useRemoteListingsHydrated();
   const saved = allListings.filter((item) => savedIds.has(item.id));
+  // Something's saved but the listing data behind it hasn't loaded yet — don't flash
+  // "Nothing saved yet" while that first fetch is still in flight.
+  const stillResolving = !hydrated && savedIds.size > 0;
   const [refreshing, setRefreshing] = useState(false);
 
   useFocusEffect(
@@ -43,10 +48,16 @@ export default function SavedPartsScreen() {
           />
         }
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>Nothing saved yet</Text>
-            <Text style={styles.emptyText}>Tap the heart on any listing to keep it here.</Text>
-          </View>
+          stillResolving ? (
+            <View style={styles.emptyState}>
+              <ActivityIndicator color={Colors.muted} />
+            </View>
+          ) : (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>Nothing saved yet</Text>
+              <Text style={styles.emptyText}>Tap the heart on any listing to keep it here.</Text>
+            </View>
+          )
         }
         renderItem={({ item }) => <ListingCard listing={item} half />}
       />

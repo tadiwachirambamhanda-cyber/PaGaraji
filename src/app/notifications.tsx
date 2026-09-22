@@ -1,16 +1,22 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { Stitch } from '@/components/stitch';
 import { useNotifications } from '@/lib/notifications';
 import { refreshAll } from '@/lib/refresh';
+import { useRemoteListingsHydrated } from '@/store/remote-listings';
+import { useRemoteRequestsHydrated } from '@/store/remote-requests';
 import { Colors, Fonts, Spacing, Type } from '@/theme';
 
 export default function NotificationsScreen() {
   const router = useRouter();
   const notifications = useNotifications();
+  // Matches are derived from both listings and requests — wait for both before trusting "Nothing new".
+  const listingsHydrated = useRemoteListingsHydrated();
+  const requestsHydrated = useRemoteRequestsHydrated();
+  const hydrated = listingsHydrated && requestsHydrated;
   const [refreshing, setRefreshing] = useState(false);
 
   useFocusEffect(
@@ -40,12 +46,18 @@ export default function NotificationsScreen() {
         }
         ItemSeparatorComponent={() => <Stitch color={Colors.muted} thickness={1} />}
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>Nothing new</Text>
-            <Text style={styles.emptyText}>
-              When a listing matches one of your open requests, it will show up here.
-            </Text>
-          </View>
+          hydrated ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>Nothing new</Text>
+              <Text style={styles.emptyText}>
+                When a listing matches one of your open requests, it will show up here.
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.emptyState}>
+              <ActivityIndicator color={Colors.muted} />
+            </View>
+          )
         }
         renderItem={({ item }) => (
           <Pressable

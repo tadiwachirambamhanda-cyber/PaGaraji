@@ -1,17 +1,19 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { PlusIcon } from '@/components/icons';
 import { ScreenHeader } from '@/components/screen-header';
 import { ListingCard } from '@/components/listing-card';
 import { refreshAll } from '@/lib/refresh';
 import { useMyListings } from '@/store/my-listings';
+import { useRemoteListingsHydrated } from '@/store/remote-listings';
 import { Colors, Fonts, Spacing, Type } from '@/theme';
 
 export default function MyListingsScreen() {
   const router = useRouter();
   const myListings = useMyListings();
+  const hydrated = useRemoteListingsHydrated();
   const [refreshing, setRefreshing] = useState(false);
 
   useFocusEffect(
@@ -50,10 +52,16 @@ export default function MyListingsScreen() {
           />
         }
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>Nothing listed yet</Text>
-            <Text style={styles.emptyText}>Tap “List a part” to post your first item, local or imported.</Text>
-          </View>
+          hydrated ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>Nothing listed yet</Text>
+              <Text style={styles.emptyText}>Tap “List a part” to post your first item, local or imported.</Text>
+            </View>
+          ) : (
+            <View style={styles.emptyState}>
+              <ActivityIndicator color={Colors.muted} />
+            </View>
+          )
         }
         renderItem={({ item }) => <ListingCard listing={item} half />}
       />

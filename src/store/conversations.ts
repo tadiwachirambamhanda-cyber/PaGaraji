@@ -48,6 +48,9 @@ function fromRow(row: ConversationRow): ConversationSummary {
 }
 
 let conversations: ConversationSummary[] = [];
+// No backend configured means there's nothing to wait for — start "hydrated" so an
+// on-device-only build doesn't get stuck showing a loading state forever.
+let hydrated = supabase === null;
 const listeners = new Set<() => void>();
 
 function emitChange() {
@@ -62,11 +65,16 @@ export async function refreshConversations(): Promise<void> {
   const { data: sessionData } = await supabase.auth.getSession();
   if (!sessionData.session) {
     conversations = [];
+    hydrated = true;
     emitChange();
     return;
   }
   const { data, error } = await supabase.from('my_conversations').select('*');
-  if (error || !data) return;
+  hydrated = true;
+  if (error || !data) {
+    emitChange();
+    return;
+  }
   conversations = (data as ConversationRow[]).map(fromRow).sort((a, b) => b.lastMessageAt - a.lastMessageAt);
   emitChange();
 }
@@ -166,4 +174,9 @@ export function useConversation(id: string | undefined) {
 
 export function useUnreadCount() {
   return useSyncExternalStore(subscribe, () => conversations.reduce((sum, c) => sum + c.unreadCount, 0));
+}
+
+/** False until the first fetch (success or failure) resolves — use to avoid flashing an empty state. */
+export function useConversationsHydrated() {
+  return useSyncExternalStore(subscribe, () => hydrated);
 }

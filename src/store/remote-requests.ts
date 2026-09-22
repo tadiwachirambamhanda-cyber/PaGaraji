@@ -31,6 +31,9 @@ function fromRow(row: RequestRow): PartRequest {
 }
 
 let requests: PartRequest[] = [];
+// No backend configured means there's nothing to wait for — start "hydrated" so an
+// on-device-only build doesn't get stuck showing a loading state forever.
+let hydrated = supabase === null;
 const listeners = new Set<() => void>();
 
 function emitChange() {
@@ -45,11 +48,16 @@ export async function refreshRemoteRequests(): Promise<void> {
   const { data: sessionData } = await supabase.auth.getSession();
   if (!sessionData.session) {
     requests = [];
+    hydrated = true;
     emitChange();
     return;
   }
   const { data, error } = await supabase.from('requests').select('*').order('created_at', { ascending: false });
-  if (error || !data) return;
+  hydrated = true;
+  if (error || !data) {
+    emitChange();
+    return;
+  }
   requests = (data as RequestRow[]).map(fromRow);
   emitChange();
 }
@@ -69,4 +77,9 @@ function subscribe(listener: () => void) {
 
 export function useRemoteRequests() {
   return useSyncExternalStore(subscribe, () => requests);
+}
+
+/** False until the first fetch (success or failure) resolves — use to avoid flashing an empty state. */
+export function useRemoteRequestsHydrated() {
+  return useSyncExternalStore(subscribe, () => hydrated);
 }

@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
   Linking,
@@ -112,7 +113,11 @@ export default function ChatThreadScreen() {
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={styles.messages}
         ListEmptyComponent={
-          messagesLoading ? null : (
+          messagesLoading ? (
+            <View style={styles.emptyThread}>
+              <ActivityIndicator color={Colors.muted} />
+            </View>
+          ) : (
             <View style={styles.emptyThread}>
               <Text style={styles.emptyThreadTitle}>Say hello to {conversation.otherName}</Text>
               <Text style={styles.emptyThreadText}>Ask about availability, price, or delivery.</Text>
@@ -145,11 +150,11 @@ export default function ChatThreadScreen() {
           multiline
         />
         <Pressable
-          style={({ pressed }) => [styles.sendButton, pressed && styles.sendButtonPressed]}
+          style={({ pressed }) => [styles.sendButton, (pressed || sending) && styles.sendButtonPressed]}
           accessibilityLabel="Send message"
           disabled={sending}
           onPress={send}>
-          <SendIcon size={18} color="#FFFFFF" />
+          {sending ? <ActivityIndicator color="#FFFFFF" size="small" /> : <SendIcon size={18} color="#FFFFFF" />}
         </Pressable>
       </View>
     </KeyboardAvoidingView>
