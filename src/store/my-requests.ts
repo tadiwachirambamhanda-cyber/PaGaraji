@@ -8,6 +8,8 @@ import { useRemoteRequests } from '@/store/remote-requests';
 const STORAGE_KEY = 'pagaraji.myRequests';
 
 export type RequestSource = 'Any' | 'Local' | 'Import';
+/** Matched: an offer was accepted and it's no longer open for more offers. */
+export type RequestStatus = 'Open' | 'Matched' | 'Closed';
 
 export type PartRequest = {
   id: string;
@@ -18,10 +20,18 @@ export type PartRequest = {
   notes: string;
   /** File names saved by lib/photos — usually the old part, or the number stamped on it. */
   photos?: string[];
+  /** What you're willing to pay, if you named a price. Sellers can offer this, or counter. */
+  budget?: number;
   createdAt: number;
-  status: 'Open' | 'Closed';
+  status: RequestStatus;
   /** True for requests stored online; `photos` then holds private storage paths. */
   remote?: boolean;
+  /** Account id of whoever posted it — only set for online requests (yours or someone else's). */
+  userId?: string;
+  /** Set once an offer's been accepted. */
+  matchedOfferId?: string;
+  /** How many pending offers are waiting on your reply — online requests only. */
+  pendingOfferCount?: number;
 };
 
 let requests: PartRequest[] = [];

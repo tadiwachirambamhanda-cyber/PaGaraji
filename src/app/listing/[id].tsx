@@ -59,6 +59,7 @@ export default function ListingDetailScreen() {
     sellerName,
     sellerInitials,
     sellerRating,
+    sellerReviewCount,
     sellerPhone,
     leadTime,
   } = listing;
@@ -240,7 +241,10 @@ export default function ListingDetailScreen() {
                 ) : sellerRating !== undefined && !isOwn ? (
                   <>
                     <StarIcon size={13} />
-                    <Text style={styles.sellerRating}>{sellerRating.toFixed(1)}</Text>
+                    <Text style={styles.sellerRating}>
+                      {sellerRating.toFixed(1)}
+                      {sellerReviewCount !== undefined ? ` (${sellerReviewCount})` : ''}
+                    </Text>
                   </>
                 ) : (
                   <Text style={styles.sellerRating}>New seller</Text>

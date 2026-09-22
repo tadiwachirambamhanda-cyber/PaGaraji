@@ -26,6 +26,8 @@ export type Listing = {
   sellerInitials: string;
   /** Only set when real ratings exist. Listings you post yourself have none. */
   sellerRating?: number;
+  /** How many reviews `sellerRating` is averaged from. */
+  sellerReviewCount?: number;
   sellerPhone: string;
   leadTime: string;
   /** Set by the seller: hidden from the feed but kept in their own list. */

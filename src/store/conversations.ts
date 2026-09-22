@@ -4,9 +4,12 @@ import { supabase } from '@/lib/supabase';
 
 export type ConversationSummary = {
   id: string;
+  /** Whether you're the buyer side of this thread — only buyers can rate the seller. */
+  isBuyer: boolean;
   otherUserId: string;
   otherName: string;
   listingId: string | null;
+  requestId: string | null;
   listingTitle: string | null;
   /** Empty when the listing this thread started from never recorded one, or has since sold. */
   listingSellerPhone: string;
@@ -21,7 +24,9 @@ export type ConversationSummary = {
 type ConversationRow = {
   id: string;
   listing_id: string | null;
+  request_id: string | null;
   created_at: string;
+  is_buyer: boolean;
   other_user_id: string;
   other_name: string | null;
   listing_title: string | null;
@@ -35,9 +40,11 @@ type ConversationRow = {
 function fromRow(row: ConversationRow): ConversationSummary {
   return {
     id: row.id,
+    isBuyer: row.is_buyer,
     otherUserId: row.other_user_id,
     otherName: row.other_name || 'PaGaraji user',
     listingId: row.listing_id,
+    requestId: row.request_id,
     listingTitle: row.listing_title,
     listingSellerPhone: row.listing_seller_phone || '',
     lastMessage: row.last_message,
@@ -170,6 +177,11 @@ export function useConversations() {
 
 export function useConversation(id: string | undefined) {
   return useSyncExternalStore(subscribe, () => conversations.find((c) => c.id === id));
+}
+
+/** The chat an accepted request offer opened, if you're revisiting after it happened. */
+export function useConversationForRequest(requestId: string | undefined) {
+  return useSyncExternalStore(subscribe, () => conversations.find((c) => c.requestId === requestId));
 }
 
 export function useUnreadCount() {

@@ -43,6 +43,7 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="welcome" options={{ animation: 'fade', gestureEnabled: false }} />
             <Stack.Screen name="listing/[id]" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="request/[id]" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="chat/[id]" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="my-listings" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="saved-parts" options={{ animation: 'slide_from_right' }} />

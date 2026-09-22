@@ -24,7 +24,14 @@ type ListingRow = {
   sold: boolean;
 };
 
-function fromRow(row: ListingRow, verifiedSellerIds: ReadonlySet<string>): Listing {
+type SellerRating = { avgRating: number; reviewCount: number };
+
+function fromRow(
+  row: ListingRow,
+  verifiedSellerIds: ReadonlySet<string>,
+  sellerRatings: ReadonlyMap<string, SellerRating>,
+): Listing {
+  const rating = sellerRatings.get(row.seller_id);
   return {
     id: row.id,
     remote: true,
@@ -41,6 +48,8 @@ function fromRow(row: ListingRow, verifiedSellerIds: ReadonlySet<string>): Listi
     description: row.description,
     sellerName: row.seller_name,
     sellerInitials: initialsOf(row.seller_name),
+    sellerRating: rating?.avgRating,
+    sellerReviewCount: rating?.reviewCount,
     sellerPhone: row.seller_phone,
     leadTime: row.lead_time,
     sold: row.sold,
@@ -64,9 +73,10 @@ function emitChange() {
 /** Fetches the latest online listings. On any failure the last known list stays. */
 export async function refreshRemoteListings(): Promise<void> {
   if (!supabase) return;
-  const [listingsResult, verifiedResult] = await Promise.all([
+  const [listingsResult, verifiedResult, ratingsResult] = await Promise.all([
     supabase.from('listings').select('*').order('created_at', { ascending: false }).limit(200),
     supabase.from('verified_suppliers').select('user_id'),
+    supabase.from('seller_ratings').select('seller_id, avg_rating, review_count'),
   ]);
   hydrated = true;
   if (listingsResult.error || !listingsResult.data) {
@@ -74,7 +84,13 @@ export async function refreshRemoteListings(): Promise<void> {
     return;
   }
   const verifiedSellerIds = new Set((verifiedResult.data ?? []).map((row) => row.user_id as string));
-  listings = (listingsResult.data as ListingRow[]).map((row) => fromRow(row, verifiedSellerIds));
+  const sellerRatings = new Map<string, SellerRating>(
+    (ratingsResult.data ?? []).map((row) => [
+      row.seller_id as string,
+      { avgRating: Number(row.avg_rating), reviewCount: row.review_count as number },
+    ]),
+  );
+  listings = (listingsResult.data as ListingRow[]).map((row) => fromRow(row, verifiedSellerIds, sellerRatings));
   emitChange();
 }
 

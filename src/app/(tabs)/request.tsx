@@ -2,6 +2,7 @@ import { Image } from 'expo-image';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -33,6 +34,7 @@ import { useSession } from '@/store/auth';
 import { timeAgo } from '@/lib/time';
 import { useAllListings, useMyListings } from '@/store/my-listings';
 import { matchListings, useMyRequests, type PartRequest, type RequestSource } from '@/store/my-requests';
+import { useOpenRequests, useOpenRequestsHydrated } from '@/store/open-requests';
 import { isApprovedSupplier, useSupplier } from '@/store/supplier';
 import { showAlert } from '@/lib/alert';
 import { Colors, Fonts, Spacing, Type } from '@/theme';
@@ -41,9 +43,16 @@ const SOURCES: RequestSource[] = ['Any', 'Local', 'Import'];
 const MODES = [
   { id: 'new', label: 'Request' },
   { id: 'sell', label: 'Sell' },
+  { id: 'browse', label: 'Open requests' },
   { id: 'mine', label: 'Your requests' },
 ] as const;
 type Mode = (typeof MODES)[number]['id'];
+
+function statusColor(status: PartRequest['status']) {
+  if (status === 'Open') return Colors.header;
+  if (status === 'Matched') return Colors.primary;
+  return Colors.muted;
+}
 
 const CATEGORY_OPTIONS = [
   { id: 'any', label: 'Any category' },
@@ -85,10 +94,15 @@ function RequestCard({ request }: { request: PartRequest }) {
         <Text style={styles.cardTitle} numberOfLines={2}>
           {request.partName}
         </Text>
-        <Stamp label={request.status.toUpperCase()} color={isOpen ? Colors.header : Colors.muted} />
+        <Stamp label={request.status.toUpperCase()} color={statusColor(request.status)} />
       </View>
       <Text style={styles.cardMeta}>
-        {[request.vehicle || null, request.source === 'Any' ? 'Local or import' : request.source, categoryLabel(request.categoryId)]
+        {[
+          request.vehicle || null,
+          request.source === 'Any' ? 'Local or import' : request.source,
+          categoryLabel(request.categoryId),
+          request.budget !== undefined ? `Budget $${request.budget}` : null,
+        ]
           .filter(Boolean)
           .join(' · ')}
       </Text>
@@ -107,6 +121,21 @@ function RequestCard({ request }: { request: PartRequest }) {
         </View>
       )}
       <Text style={styles.cardTime}>{timeAgo(request.createdAt)}</Text>
+
+      {request.remote && request.status !== 'Closed' && (
+        <Pressable
+          style={({ pressed }) => [styles.offersRow, pressed && styles.pressed]}
+          onPress={() => router.push(`/request/${request.id}`)}>
+          <Text style={styles.offersRowText}>
+            {request.status === 'Matched'
+              ? 'Offer accepted — open chat'
+              : request.pendingOfferCount
+                ? `${request.pendingOfferCount} offer${request.pendingOfferCount === 1 ? '' : 's'} waiting`
+                : 'No offers yet'}
+          </Text>
+          <Text style={styles.matchArrow}>→</Text>
+        </Pressable>
+      )}
 
       {isOpen && (
         <View style={styles.matches}>
@@ -141,13 +170,76 @@ function RequestCard({ request }: { request: PartRequest }) {
             const problem = await toggleRequest(request);
             if (problem) showAlert('Couldn’t update the request', problem);
           }}>
-          <Text style={styles.actionText}>{isOpen ? 'Close request' : 'Reopen'}</Text>
+          <Text style={styles.actionText}>
+            {request.status === 'Open' ? 'Close request' : request.status === 'Matched' ? 'Mark done' : 'Reopen'}
+          </Text>
         </Pressable>
         <Pressable hitSlop={8} onPress={confirmDelete}>
           <Text style={[styles.actionText, styles.actionDanger]}>Delete</Text>
         </Pressable>
       </View>
       <PhotoViewer sources={photoSources} index={viewerIndex} onClose={() => setViewerIndex(null)} />
+    </View>
+  );
+}
+
+function BrowseCard({ request }: { request: PartRequest }) {
+  const router = useRouter();
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+      onPress={() => router.push(`/request/${request.id}`)}>
+      <View style={styles.cardTop}>
+        <Text style={styles.cardTitle} numberOfLines={2}>
+          {request.partName}
+        </Text>
+        {request.budget !== undefined && <Text style={styles.browseBudget}>${request.budget}</Text>}
+      </View>
+      <Text style={styles.cardMeta}>
+        {[request.vehicle || null, request.source === 'Any' ? 'Local or import' : request.source, categoryLabel(request.categoryId)]
+          .filter(Boolean)
+          .join(' · ')}
+      </Text>
+      {request.notes !== '' && (
+        <Text style={styles.cardNotes} numberOfLines={2}>
+          {request.notes}
+        </Text>
+      )}
+      <View style={styles.browseFooter}>
+        <Text style={styles.cardTime}>{timeAgo(request.createdAt)}</Text>
+        <Text style={styles.offersRowText}>Make an offer →</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function BrowsePanel() {
+  const requests = useOpenRequests();
+  const hydrated = useOpenRequestsHydrated();
+
+  if (!hydrated) {
+    return <ActivityIndicator color={Colors.muted} style={styles.browseLoading} />;
+  }
+  if (requests.length === 0) {
+    return (
+      <View style={styles.emptyState}>
+        <Text style={styles.emptyTitle}>Nothing open right now</Text>
+        <Text style={styles.emptyText}>When someone posts what they need, it shows up here for you to offer on.</Text>
+      </View>
+    );
+  }
+  return (
+    <View>
+      {requests.map((request, index) => (
+        <View key={request.id}>
+          {index > 0 && (
+            <View style={styles.cardGap}>
+              <Stitch />
+            </View>
+          )}
+          <BrowseCard request={request} />
+        </View>
+      ))}
     </View>
   );
 }
@@ -237,6 +329,7 @@ export default function RequestScreen() {
   const [vehicle, setVehicle] = useState('');
   const [notes, setNotes] = useState('');
   const [photos, setPhotos] = useState<string[]>([]);
+  const [budget, setBudget] = useState('');
   const session = useSession();
   const [busy, setBusy] = useState(false);
   const [source, setSource] = useState<RequestSource>('Any');
@@ -273,6 +366,7 @@ export default function RequestScreen() {
       return;
     }
     setBusy(true);
+    const budgetValue = Number(budget);
     const problem = await createRequest({
       partName: partName.trim(),
       vehicle: vehicle.trim(),
@@ -280,6 +374,7 @@ export default function RequestScreen() {
       categoryId,
       notes: notes.trim(),
       photos,
+      budget: budget.trim() !== '' && Number.isFinite(budgetValue) && budgetValue > 0 ? budgetValue : undefined,
     });
     setBusy(false);
     if (problem) {
@@ -291,6 +386,7 @@ export default function RequestScreen() {
     setVehicle('');
     setNotes('');
     setPhotos([]);
+    setBudget('');
     setSource('Any');
     setCategoryId('any');
     setMode('mine');
@@ -300,9 +396,12 @@ export default function RequestScreen() {
   const subtitle =
     mode === 'sell'
       ? 'List a part for buyers across Zimbabwe, from your shelf or from overseas.'
-      : mode === 'mine' && requests.length > 0
-        ? `${openCount} open`
-        : 'Post what you need. We’ll match it against listings, local or overseas.';
+      : mode === 'browse'
+        ? 'Name a price and offer on what someone else needs — no listing required.'
+        : mode === 'mine' && requests.length > 0
+          ? `${openCount} open`
+          : 'Post what you need and a price you’d pay. Sellers can offer that price, or counter.';
+  const title = mode === 'sell' ? 'Got a part\nto sell?' : mode === 'browse' ? 'Who needs\na hand?' : 'Can’t find\nthe part?';
 
   return (
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -320,7 +419,7 @@ export default function RequestScreen() {
             }}
           />
         }>
-        <PageHeader title={mode === 'sell' ? 'Got a part\nto sell?' : 'Can’t find\nthe part?'} subtitle={subtitle} />
+        <PageHeader title={title} subtitle={subtitle} />
 
         <View style={styles.tabs}>
           <CategoryTabs categories={MODES} value={mode} onChange={(id) => setMode(id as Mode)} />
@@ -364,6 +463,18 @@ export default function RequestScreen() {
               </View>
 
               <View style={styles.field}>
+                <Text style={styles.label}>Your budget, USD (optional)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="45"
+                  placeholderTextColor={Colors.placeholder}
+                  keyboardType="decimal-pad"
+                  value={budget}
+                  onChangeText={setBudget}
+                />
+              </View>
+
+              <View style={styles.field}>
                 <Text style={styles.label}>Photos (optional)</Text>
                 <PhotoPicker photos={photos} onChange={setPhotos} max={3} hint="The old part, or the number stamped on it" />
               </View>
@@ -382,6 +493,8 @@ export default function RequestScreen() {
 
               <Button label={busy ? 'One moment…' : 'Post request'} variant="primary" onPress={handleSubmit} />
             </>
+          ) : mode === 'browse' ? (
+            <BrowsePanel />
           ) : requests.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyTitle}>No requests yet</Text>
@@ -471,6 +584,35 @@ const styles = StyleSheet.create({
   sellArrow: {
     fontFamily: Fonts.bodyBold,
     fontSize: Type.body,
+    color: Colors.header,
+  },
+  browseLoading: {
+    marginTop: Spacing.xxxl,
+  },
+  browseBudget: {
+    fontFamily: Fonts.headingBold,
+    fontSize: Type.title,
+    color: Colors.ink,
+  },
+  browseFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: Spacing.xs,
+  },
+  offersRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: Spacing.xs,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+    backgroundColor: '#FBF3DE',
+    borderRadius: 10,
+  },
+  offersRowText: {
+    fontFamily: Fonts.bodyBold,
+    fontSize: Type.small,
     color: Colors.header,
   },
   cardGap: {

@@ -14,9 +14,12 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ArrowLeftIcon, ChatIcon, SendIcon } from '@/components/icons';
-import { tapLight } from '@/lib/haptics';
+import { ArrowLeftIcon, ChatIcon, SendIcon, StarIcon } from '@/components/icons';
+import { RateSellerSheet } from '@/components/rate-seller-sheet';
+import { showAlert } from '@/lib/alert';
+import { success, tapLight } from '@/lib/haptics';
 import { markConversationRead, sendChatMessage, useThreadMessages } from '@/lib/messages';
+import { fetchMyReview, submitReview, type SellerReview } from '@/lib/reviews';
 import { useSession } from '@/store/auth';
 import { refreshConversations, useConversation } from '@/store/conversations';
 import { initialsOf } from '@/store/profile';
@@ -32,12 +35,20 @@ export default function ChatThreadScreen() {
   const [draft, setDraft] = useState(initialDraft ?? '');
   const [sending, setSending] = useState(false);
   const [checkedConversation, setCheckedConversation] = useState(false);
+  // undefined: not checked yet. null: checked, no review exists yet.
+  const [myReview, setMyReview] = useState<SellerReview | null | undefined>(undefined);
+  const [rateSheetOpen, setRateSheetOpen] = useState(false);
   const listRef = useRef<FlatList>(null);
   const messageCount = messages.length;
 
   useEffect(() => {
     if (id) markConversationRead(id);
   }, [id, messageCount]);
+
+  // Only the buyer side of a thread can rate the seller — check once we know that's us.
+  useEffect(() => {
+    if (id && conversation?.isBuyer) fetchMyReview(id).then(setMyReview);
+  }, [id, conversation?.isBuyer]);
 
   // The cached list might not have this thread yet (e.g. a fresh app start) — check the server
   // directly once rather than flashing "not found" while that first fetch is still in flight.
@@ -73,6 +84,17 @@ export default function ChatThreadScreen() {
     Linking.openURL(`https://wa.me/${conversation.listingSellerPhone}`);
   };
 
+  const rateSeller = async (rating: number, comment: string) => {
+    const problem = await submitReview(conversation.id, conversation.otherUserId, rating, comment);
+    if (problem) {
+      showAlert('Couldn’t submit your rating', problem);
+      return problem;
+    }
+    setMyReview({ rating, comment });
+    success();
+    return null;
+  };
+
   return (
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
@@ -106,6 +128,23 @@ export default function ChatThreadScreen() {
           </Pressable>
         )}
       </View>
+
+      {conversation.isBuyer && myReview === null && (
+        <Pressable
+          style={({ pressed }) => [styles.rateBanner, pressed && styles.rateBannerPressed]}
+          onPress={() => setRateSheetOpen(true)}>
+          <StarIcon size={15} />
+          <Text style={styles.rateBannerText}>Bought something? Rate {conversation.otherName}</Text>
+        </Pressable>
+      )}
+      {conversation.isBuyer && myReview && (
+        <View style={styles.rateBanner}>
+          <StarIcon size={15} />
+          <Text style={styles.rateBannerText}>
+            You rated {conversation.otherName} {myReview.rating}/5
+          </Text>
+        </View>
+      )}
 
       <FlatList
         ref={listRef}
@@ -157,6 +196,13 @@ export default function ChatThreadScreen() {
           {sending ? <ActivityIndicator color="#FFFFFF" size="small" /> : <SendIcon size={18} color="#FFFFFF" />}
         </Pressable>
       </View>
+
+      <RateSellerSheet
+        visible={rateSheetOpen}
+        onClose={() => setRateSheetOpen(false)}
+        sellerName={conversation.otherName}
+        onSubmit={rateSeller}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -228,6 +274,24 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.bodyMedium,
     fontSize: Type.caption,
     color: Colors.header,
+  },
+  rateBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.sm,
+    backgroundColor: '#FBF3DE',
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  rateBannerPressed: {
+    opacity: 0.7,
+  },
+  rateBannerText: {
+    fontFamily: Fonts.bodyBold,
+    fontSize: Type.small,
+    color: Colors.ink,
   },
   messages: {
     padding: Spacing.xl,
