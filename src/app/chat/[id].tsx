@@ -14,47 +14,62 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ArrowLeftIcon, ChatIcon, SendIcon } from '@/components/icons';
-import { Stamp } from '@/components/stamp';
 import { tapLight } from '@/lib/haptics';
-import { markRead, sendMessage, useConversation } from '@/store/conversations';
+import { markConversationRead, sendChatMessage, useThreadMessages } from '@/lib/messages';
+import { useSession } from '@/store/auth';
+import { refreshConversations, useConversation } from '@/store/conversations';
+import { initialsOf } from '@/store/profile';
 import { Colors, Fonts, Spacing, Type } from '@/theme';
 
 export default function ChatThreadScreen() {
-  const { id, draft: initialDraft } = useLocalSearchParams<{
-    id: string;
-    draft?: string;
-  }>();
+  const { id, draft: initialDraft } = useLocalSearchParams<{ id: string; draft?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const session = useSession();
   const conversation = useConversation(id);
+  const { messages, loading: messagesLoading } = useThreadMessages(id);
   const [draft, setDraft] = useState(initialDraft ?? '');
+  const [sending, setSending] = useState(false);
+  const [checkedConversation, setCheckedConversation] = useState(false);
   const listRef = useRef<FlatList>(null);
-  const messageCount = conversation?.messages.length ?? 0;
+  const messageCount = messages.length;
 
   useEffect(() => {
-    if (id) markRead(id);
+    if (id) markConversationRead(id);
   }, [id, messageCount]);
+
+  // The cached list might not have this thread yet (e.g. a fresh app start) — check the server
+  // directly once rather than flashing "not found" while that first fetch is still in flight.
+  useEffect(() => {
+    if (conversation || checkedConversation) return;
+    refreshConversations().then(() => setCheckedConversation(true));
+  }, [conversation, checkedConversation]);
 
   if (!conversation) {
     return (
       <View style={[styles.screen, styles.center]}>
-        <Text style={styles.notFound}>Conversation not found.</Text>
+        {checkedConversation && <Text style={styles.notFound}>Conversation not found.</Text>}
       </View>
     );
   }
 
-  const isImported = conversation.origin !== 'Local';
-
-  const send = () => {
-    if (draft.trim() === '') return;
+  const send = async () => {
+    const body = draft.trim();
+    if (body === '' || sending) return;
     tapLight();
-    sendMessage(conversation.id, draft.trim());
     setDraft('');
+    setSending(true);
+    const problem = await sendChatMessage(conversation.id, body);
+    setSending(false);
+    if (problem) {
+      setDraft(body); // give it back so nothing typed is lost
+      return;
+    }
     requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
   };
 
   const openWhatsApp = () => {
-    Linking.openURL(`https://wa.me/${conversation.sellerPhone}`);
+    Linking.openURL(`https://wa.me/${conversation.listingSellerPhone}`);
   };
 
   return (
@@ -68,17 +83,19 @@ export default function ChatThreadScreen() {
           <ArrowLeftIcon size={20} color={Colors.ink} />
         </Pressable>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{conversation.initials}</Text>
+          <Text style={styles.avatarText}>{initialsOf(conversation.otherName)}</Text>
         </View>
         <View style={styles.headerInfo}>
           <Text style={styles.headerName} numberOfLines={1}>
-            {conversation.sellerName}
+            {conversation.otherName}
           </Text>
-          <View style={styles.headerMeta}>
-            <Stamp label={isImported ? `${conversation.origin.toUpperCase()} IMPORT` : 'LOCAL'} imported={isImported} />
-          </View>
+          {conversation.listingTitle && (
+            <Text style={styles.headerListing} numberOfLines={1}>
+              About: {conversation.listingTitle}
+            </Text>
+          )}
         </View>
-        {Platform.OS !== 'web' && (
+        {Platform.OS !== 'web' && conversation.listingSellerPhone !== '' && (
           <Pressable
             style={({ pressed }) => [styles.iconButton, styles.whatsappIcon, pressed && styles.iconButtonPressed]}
             accessibilityLabel="Chat on WhatsApp"
@@ -91,31 +108,31 @@ export default function ChatThreadScreen() {
 
       <FlatList
         ref={listRef}
-        data={conversation.messages}
-        keyExtractor={(item) => item.id}
+        data={messages}
+        keyExtractor={(item) => String(item.id)}
         contentContainerStyle={styles.messages}
         ListEmptyComponent={
-          <View style={styles.emptyThread}>
-            <Text style={styles.emptyThreadTitle}>Say hello to {conversation.sellerName}</Text>
-            <Text style={styles.emptyThreadText}>Ask about availability, price, or delivery.</Text>
-          </View>
+          messagesLoading ? null : (
+            <View style={styles.emptyThread}>
+              <Text style={styles.emptyThreadTitle}>Say hello to {conversation.otherName}</Text>
+              <Text style={styles.emptyThreadText}>Ask about availability, price, or delivery.</Text>
+            </View>
+          )
         }
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
-        renderItem={({ item }) => (
-          <View style={[styles.bubbleRow, item.sender === 'me' ? styles.bubbleRowMe : styles.bubbleRowThem]}>
-            <View style={[styles.bubble, item.sender === 'me' ? styles.bubbleMe : styles.bubbleThem]}>
-              <Text style={[styles.bubbleText, item.sender === 'me' && styles.bubbleTextMe]}>{item.text}</Text>
+        renderItem={({ item }) => {
+          const mine = item.senderId === session?.user.id;
+          return (
+            <View style={[styles.bubbleRow, mine ? styles.bubbleRowMe : styles.bubbleRowThem]}>
+              <View style={[styles.bubble, mine ? styles.bubbleMe : styles.bubbleThem]}>
+                <Text style={[styles.bubbleText, mine && styles.bubbleTextMe]}>{item.body}</Text>
+              </View>
+              <Text style={styles.bubbleTime}>
+                {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </Text>
             </View>
-            <Text style={styles.bubbleTime}>
-              {item.sentAt
-                ? new Date(item.sentAt).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })
-                : item.time}
-            </Text>
-          </View>
-        )}
+          );
+        }}
       />
 
       <View style={[styles.inputRow, { paddingBottom: insets.bottom + Spacing.sm }]}>
@@ -130,6 +147,7 @@ export default function ChatThreadScreen() {
         <Pressable
           style={({ pressed }) => [styles.sendButton, pressed && styles.sendButtonPressed]}
           accessibilityLabel="Send message"
+          disabled={sending}
           onPress={send}>
           <SendIcon size={18} color="#FFFFFF" />
         </Pressable>
@@ -201,10 +219,10 @@ const styles = StyleSheet.create({
     fontSize: Type.body,
     color: Colors.ink,
   },
-  headerMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
+  headerListing: {
+    fontFamily: Fonts.bodyMedium,
+    fontSize: Type.caption,
+    color: Colors.header,
   },
   messages: {
     padding: Spacing.xl,

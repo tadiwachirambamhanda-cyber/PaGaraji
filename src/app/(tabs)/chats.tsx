@@ -1,44 +1,57 @@
-import { useRouter } from 'expo-router';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { PageHeader } from '@/components/page-header';
 import { Stitch } from '@/components/stitch';
-import type { Conversation } from '@/data/conversations';
+import { refreshAll } from '@/lib/refresh';
 import { timeAgo } from '@/lib/time';
-import { useConversations } from '@/store/conversations';
+import { initialsOf } from '@/store/profile';
+import { refreshConversations, useConversations, type ConversationSummary } from '@/store/conversations';
 import { Colors, Fonts, Spacing, Type } from '@/theme';
 
-function ConversationRow({ item }: { item: Conversation }) {
-  const isImported = item.origin !== 'Local';
+function ConversationRow({ item }: { item: ConversationSummary }) {
   const router = useRouter();
-  const time = item.activity > 0 ? timeAgo(item.activity) : item.time;
+  const unread = item.unreadCount > 0;
 
   return (
     <Pressable
       style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
       onPress={() => router.push(`/chat/${item.id}`)}>
-      <View style={[styles.avatar, isImported && styles.avatarImport]}>
-        <Text style={[styles.avatarText, isImported && styles.avatarTextImport]}>{item.initials}</Text>
+      <View style={styles.avatar}>
+        <Text style={styles.avatarText}>{initialsOf(item.otherName)}</Text>
       </View>
       <View style={styles.rowContent}>
         <View style={styles.rowTop}>
-          <Text style={[styles.sellerName, item.unread && styles.sellerNameUnread]} numberOfLines={1}>
-            {item.sellerName}
+          <Text style={[styles.sellerName, unread && styles.sellerNameUnread]} numberOfLines={1}>
+            {item.otherName}
           </Text>
-          <Text style={styles.time}>{time}</Text>
+          <Text style={styles.time}>{timeAgo(item.lastMessageAt)}</Text>
         </View>
-        <Text style={[styles.lastMessage, item.unread && styles.lastMessageUnread]} numberOfLines={1}>
-          {item.lastMessage}
+        {item.listingTitle && (
+          <Text style={styles.listingTitle} numberOfLines={1}>
+            About: {item.listingTitle}
+          </Text>
+        )}
+        <Text style={[styles.lastMessage, unread && styles.lastMessageUnread]} numberOfLines={1}>
+          {item.lastMessage ?? 'Say hello'}
         </Text>
       </View>
-      {item.unread && <View style={styles.unreadDot} />}
+      {unread && <View style={styles.unreadDot} />}
     </Pressable>
   );
 }
 
 export default function ChatsScreen() {
   const conversations = useConversations();
-  const unread = conversations.filter((c) => c.unread).length;
+  const unread = conversations.filter((c) => c.unreadCount > 0).length;
+  const [refreshing, setRefreshing] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshAll();
+    }, []),
+  );
 
   return (
     <View style={styles.screen}>
@@ -46,6 +59,17 @@ export default function ChatsScreen() {
         data={conversations}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            tintColor={Colors.header}
+            onRefresh={async () => {
+              setRefreshing(true);
+              await refreshConversations();
+              setRefreshing(false);
+            }}
+          />
+        }
         ListHeaderComponent={
           <PageHeader title="Chats" subtitle={unread > 0 ? `${unread} waiting for a reply` : undefined} />
         }
@@ -97,16 +121,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     transform: [{ rotate: '-3deg' }],
   },
-  avatarImport: {
-    backgroundColor: Colors.accent,
-  },
   avatarText: {
     fontFamily: Fonts.headingBold,
     fontSize: Type.body,
     color: '#FFFFFF',
-  },
-  avatarTextImport: {
-    color: Colors.tagInk,
   },
   rowContent: {
     flex: 1,
@@ -131,6 +149,11 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.bodyRegular,
     fontSize: Type.caption,
     color: Colors.muted,
+  },
+  listingTitle: {
+    fontFamily: Fonts.bodyMedium,
+    fontSize: Type.caption,
+    color: Colors.header,
   },
   lastMessage: {
     fontFamily: Fonts.bodyRegular,

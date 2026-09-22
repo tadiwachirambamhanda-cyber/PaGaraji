@@ -20,6 +20,7 @@ import { getOrCreateConversation } from '@/store/conversations';
 import { deleteListing, setListingSold } from '@/lib/listing-actions';
 import { useAllListings, useMyListings } from '@/store/my-listings';
 import { toggleSaved, useIsSaved } from '@/store/saved-listings';
+import { useSession } from '@/store/auth';
 import { showAlert } from '@/lib/alert';
 import { Colors, Fonts, Spacing, Type } from '@/theme';
 
@@ -28,8 +29,10 @@ export default function ListingDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
+  const session = useSession();
   const [page, setPage] = useState(0);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const [messaging, setMessaging] = useState(false);
   const saved = useIsSaved(id ?? '');
   const allListings = useAllListings();
   const myListings = useMyListings();
@@ -93,15 +96,25 @@ export default function ListingDetailScreen() {
     success();
   };
 
-  const openMessage = () => {
-    const { id: conversationId, created } = getOrCreateConversation({
-      name: sellerName,
-      initials: sellerInitials,
-      phone: sellerPhone,
-      origin,
-    });
-    const draft = created ? `?draft=${encodeURIComponent(`Hi, is the ${title} still available?`)}` : '';
-    router.push(`/chat/${conversationId}${draft}`);
+  const openMessage = async () => {
+    if (!listing.sellerId) return; // a sample listing — no real account behind it to message
+    if (!session) {
+      showAlert('Sign in to message', 'Create a free account or sign in so the seller can reply to you.', [
+        { text: 'Not now', style: 'cancel' },
+        { text: 'Sign in', onPress: () => router.push('/sign-in') },
+      ]);
+      return;
+    }
+    if (messaging) return;
+    setMessaging(true);
+    const result = await getOrCreateConversation(listing.sellerId, listing.id);
+    setMessaging(false);
+    if ('error' in result) {
+      showAlert('Couldn’t open the chat', result.error);
+      return;
+    }
+    const draft = result.created ? `?draft=${encodeURIComponent(`Hi, is the ${title} still available?`)}` : '';
+    router.push(`/chat/${result.id}${draft}`);
   };
 
   const shareOnWhatsApp = () => {
@@ -262,13 +275,17 @@ export default function ListingDetailScreen() {
               <Button label={listing.sold ? 'Relist' : 'Mark as sold'} variant="primary" onPress={toggleSold} />
             </View>
           </View>
+        ) : !listing.sellerId && (Platform.OS === 'web' || sellerPhone === '') ? (
+          <Text style={styles.ownNote}>This is a sample listing — there’s no real seller to contact.</Text>
         ) : (
           <View style={styles.actionRow}>
-            <View style={styles.actionSecondary}>
-              <Button label="Message" variant="outline" onPress={openMessage} />
-            </View>
-            {Platform.OS !== 'web' && (
-              <View style={styles.actionPrimary}>
+            {listing.sellerId && (
+              <View style={styles.actionSecondary}>
+                <Button label={messaging ? 'One moment…' : 'Message'} variant="outline" onPress={openMessage} />
+              </View>
+            )}
+            {Platform.OS !== 'web' && sellerPhone !== '' && (
+              <View style={listing.sellerId ? styles.actionPrimary : styles.actionSecondary}>
                 <Button
                   label="WhatsApp"
                   variant="whatsapp"

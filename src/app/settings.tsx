@@ -108,7 +108,7 @@ export default function SettingsScreen() {
             onPress={() =>
               confirm(
                 'Reset everything?',
-                'Saved parts, chats, vehicle, settings and anything kept only on this phone are cleared. Your account, online listings and requests are not affected.',
+                'Saved parts, vehicle, settings and anything kept only on this phone are cleared. Your account, chats, online listings and requests are not affected.',
                 'Reset',
                 resetAllData,
               )

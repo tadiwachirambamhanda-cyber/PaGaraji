@@ -1,11 +1,53 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSyncExternalStore } from 'react';
 
-import type { Conversation, Message } from '@/data/conversations';
+import { supabase } from '@/lib/supabase';
 
-const STORAGE_KEY = 'pagaraji.conversations';
+export type ConversationSummary = {
+  id: string;
+  otherUserId: string;
+  otherName: string;
+  listingId: string | null;
+  listingTitle: string | null;
+  /** Empty when the listing this thread started from never recorded one, or has since sold. */
+  listingSellerPhone: string;
+  lastMessage: string | null;
+  /** Falls back to when the thread was created, so a not-yet-answered thread still sorts sanely. */
+  lastMessageAt: number;
+  lastMessageSenderId: string | null;
+  unreadCount: number;
+};
 
-let conversations: Conversation[] = [];
+/** A row of the `my_conversations` view, as the API returns it. */
+type ConversationRow = {
+  id: string;
+  listing_id: string | null;
+  created_at: string;
+  other_user_id: string;
+  other_name: string | null;
+  listing_title: string | null;
+  listing_seller_phone: string | null;
+  last_message: string | null;
+  last_message_at: string | null;
+  last_message_sender_id: string | null;
+  unread_count: number;
+};
+
+function fromRow(row: ConversationRow): ConversationSummary {
+  return {
+    id: row.id,
+    otherUserId: row.other_user_id,
+    otherName: row.other_name || 'PaGaraji user',
+    listingId: row.listing_id,
+    listingTitle: row.listing_title,
+    listingSellerPhone: row.listing_seller_phone || '',
+    lastMessage: row.last_message,
+    lastMessageAt: Date.parse(row.last_message_at ?? row.created_at),
+    lastMessageSenderId: row.last_message_sender_id,
+    unreadCount: row.unread_count,
+  };
+}
+
+let conversations: ConversationSummary[] = [];
 const listeners = new Set<() => void>();
 
 function emitChange() {
@@ -14,68 +56,99 @@ function emitChange() {
   }
 }
 
-AsyncStorage.getItem(STORAGE_KEY)
-  .then((raw) => {
-    if (!raw) return;
-    // Earlier builds shipped sample threads (activity 0). Real ones always have a timestamp.
-    conversations = (JSON.parse(raw) as Conversation[]).filter((c) => c.activity > 0);
+/** Re-fetches your threads (newest activity first). Signed out: none. */
+export async function refreshConversations(): Promise<void> {
+  if (!supabase) return;
+  const { data: sessionData } = await supabase.auth.getSession();
+  if (!sessionData.session) {
+    conversations = [];
     emitChange();
-  })
-  .catch(() => {
-    // Nothing persisted yet, or storage unavailable — start with no conversations.
-  });
-
-function commit(next: Conversation[]) {
-  conversations = next;
+    return;
+  }
+  const { data, error } = await supabase.from('my_conversations').select('*');
+  if (error || !data) return;
+  conversations = (data as ConversationRow[]).map(fromRow).sort((a, b) => b.lastMessageAt - a.lastMessageAt);
   emitChange();
-  AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(conversations)).catch(() => {});
 }
 
-export function resetConversations() {
-  commit([]);
+// Keeps the Chats list and the tab-bar badge live everywhere in the app. RLS on `messages`
+// means this only ever delivers events from conversations you're actually part of — but only
+// once Realtime's websocket actually knows who you are, which isn't true yet at module load
+// (the saved session is still being read from storage). Subscribing has to wait for a real,
+// signed-in auth event, or it silently connects as nobody and never receives anything.
+let activityChannel: ReturnType<NonNullable<typeof supabase>['channel']> | null = null;
+
+function subscribeToActivity() {
+  if (!supabase || activityChannel) return;
+  activityChannel = supabase
+    .channel('conversations-activity')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
+      refreshConversations();
+    })
+    .subscribe();
 }
 
-export function sendMessage(conversationId: string, text: string) {
-  const now = Date.now();
-  const message: Message = { id: `msg-${now}`, sender: 'me', text, time: 'Now', sentAt: now };
-  commit(
-    conversations.map((c) =>
-      c.id === conversationId
-        ? { ...c, messages: [...c.messages, message], lastMessage: text, activity: now, unread: false }
-        : c,
-    ),
-  );
+function unsubscribeFromActivity() {
+  if (!supabase || !activityChannel) return;
+  supabase.removeChannel(activityChannel);
+  activityChannel = null;
 }
 
-export function markRead(conversationId: string) {
-  if (!conversations.some((c) => c.id === conversationId && c.unread)) return;
-  commit(conversations.map((c) => (c.id === conversationId ? { ...c, unread: false } : c)));
+if (supabase) {
+  refreshConversations();
+  // Deferred: Supabase asks that its own calls are not made inside this callback.
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (event !== 'TOKEN_REFRESHED') setTimeout(refreshConversations, 0);
+    if (session) subscribeToActivity();
+    else unsubscribeFromActivity();
+  });
 }
 
-type Seller = { name: string; initials: string; phone: string; origin: Conversation['origin'] };
+/**
+ * Returns the thread with this seller, starting one if you've never messaged them before.
+ * `sellerId` and `listingId` come straight off a `Listing` (its `sellerId`, and its `id` for
+ * context — "About: Front brake pads" in the thread header).
+ */
+export async function getOrCreateConversation(
+  sellerId: string,
+  listingId?: string,
+): Promise<{ id: string; created: boolean; error?: undefined } | { error: string }> {
+  if (!supabase) return { error: 'Messaging isn’t set up yet.' };
+  const { data: sessionData } = await supabase.auth.getSession();
+  const myId = sessionData.session?.user.id;
+  if (!myId) return { error: 'Sign in to send a message.' };
+  if (myId === sellerId) return { error: 'This is your own listing.' };
 
-/** Returns the existing thread with this seller (matched by phone), or starts a new one. */
-export function getOrCreateConversation(seller: Seller): { id: string; created: boolean } {
-  const existing = conversations.find((c) => c.sellerPhone === seller.phone);
+  const { data: existing, error: findError } = await supabase
+    .from('conversations')
+    .select('id')
+    .eq('buyer_id', myId)
+    .eq('seller_id', sellerId)
+    .maybeSingle();
+  if (findError) return { error: findError.message };
   if (existing) return { id: existing.id, created: false };
 
-  const id = `conv-${Date.now()}`;
-  commit([
-    {
-      id,
-      sellerName: seller.name,
-      initials: seller.initials,
-      sellerPhone: seller.phone,
-      lastMessage: 'No messages yet',
-      time: '',
-      unread: false,
-      origin: seller.origin,
-      activity: Date.now(),
-      messages: [],
-    },
-    ...conversations,
-  ]);
-  return { id, created: true };
+  const { data: created, error: insertError } = await supabase
+    .from('conversations')
+    .insert({ buyer_id: myId, seller_id: sellerId, listing_id: listingId ?? null })
+    .select('id')
+    .single();
+  if (insertError) {
+    // Two taps racing to open the same thread both try to create it; the loser just reads
+    // what the winner made, rather than showing an error for something that isn't one.
+    if (insertError.code === '23505') {
+      const { data: raced } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('buyer_id', myId)
+        .eq('seller_id', sellerId)
+        .maybeSingle();
+      if (raced) return { id: raced.id, created: false };
+    }
+    return { error: insertError.message };
+  }
+  await refreshConversations();
+  return { id: created.id, created: true };
 }
 
 function subscribe(listener: () => void) {
@@ -83,13 +156,8 @@ function subscribe(listener: () => void) {
   return () => listeners.delete(listener);
 }
 
-function byActivity(list: Conversation[]) {
-  return [...list].sort((a, b) => b.activity - a.activity);
-}
-
 export function useConversations() {
-  const list = useSyncExternalStore(subscribe, () => conversations);
-  return byActivity(list);
+  return useSyncExternalStore(subscribe, () => conversations);
 }
 
 export function useConversation(id: string | undefined) {
@@ -97,5 +165,5 @@ export function useConversation(id: string | undefined) {
 }
 
 export function useUnreadCount() {
-  return useSyncExternalStore(subscribe, () => conversations.filter((c) => c.unread).length);
+  return useSyncExternalStore(subscribe, () => conversations.reduce((sum, c) => sum + c.unreadCount, 0));
 }
