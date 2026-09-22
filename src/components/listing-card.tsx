@@ -58,10 +58,18 @@ export function ListingCard({ listing, variant = 'compact', half }: ListingCardP
           <View style={styles.stamp}>
             <Stamp label="SOLD" color={Colors.danger} />
           </View>
-        ) : hero && (
+        ) : listing.verified ? (
+          // A stronger trust signal than where it ships from, so it takes the one stamp slot
+          // even on the compact cards that otherwise skip the origin stamp entirely.
           <View style={styles.stamp}>
-            <Stamp label={stampLabel(listing)} imported={isImported} />
+            <Stamp label="VERIFIED" color={Colors.header} />
           </View>
+        ) : (
+          hero && (
+            <View style={styles.stamp}>
+              <Stamp label={stampLabel(listing)} imported={isImported} />
+            </View>
+          )
         )}
         <View style={styles.save}>
           <SaveButton id={id} />

@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useMemo, useSyncExternalStore } from 'react';
 
 import { iconForCategory } from '@/data/categories';
-import { listings, type Listing } from '@/data/listings';
+import type { Listing } from '@/data/listings';
 import { deletePhotos } from '@/lib/photos';
 import { useRemoteListings } from '@/store/remote-listings';
 import { useSession } from '@/store/auth';
@@ -103,12 +103,9 @@ export function useMyListings(): Listing[] {
   );
 }
 
-/** The feed: live online listings, listings from this phone, then the sample listings. */
+/** The feed: live online listings, plus any that only exist on this phone. */
 export function useAllListings(): Listing[] {
   const local = useLocalListings();
   const remote = useRemoteListings();
-  return useMemo(() => {
-    const live = [...remote, ...local].filter((l) => !l.sold);
-    return live.length === 0 ? listings : [...live, ...listings];
-  }, [local, remote]);
+  return useMemo(() => [...remote, ...local].filter((l) => !l.sold), [local, remote]);
 }
