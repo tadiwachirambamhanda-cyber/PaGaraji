@@ -1,0 +1,570 @@
+import { Image } from 'expo-image';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+
+import { Button } from '@/components/button';
+import { CategoryTabs } from '@/components/category-tabs';
+import { ChipSelect } from '@/components/chip-select';
+import { PageHeader } from '@/components/page-header';
+import { PhotoPicker } from '@/components/photo-picker';
+import { PhotoViewer } from '@/components/photo-viewer';
+import { SegmentedControl } from '@/components/segmented-control';
+import { Stamp } from '@/components/stamp';
+import { Stitch } from '@/components/stitch';
+import { categories } from '@/data/categories';
+import { success } from '@/lib/haptics';
+import { photoUri } from '@/lib/photos';
+import { createRequest, deleteRequest, toggleRequest } from '@/lib/request-actions';
+import { useSignedRequestPhotoUrls } from '@/lib/signed-urls';
+import { backendEnabled } from '@/lib/supabase';
+import { useSession } from '@/store/auth';
+import { timeAgo } from '@/lib/time';
+import { useAllListings, useMyListings } from '@/store/my-listings';
+import { matchListings, useMyRequests, type PartRequest, type RequestSource } from '@/store/my-requests';
+import { isApprovedSupplier, useSupplier } from '@/store/supplier';
+import { showAlert } from '@/lib/alert';
+import { Colors, Fonts, Spacing, Type } from '@/theme';
+
+const SOURCES: RequestSource[] = ['Any', 'Local', 'Import'];
+const MODES = [
+  { id: 'new', label: 'Request' },
+  { id: 'sell', label: 'Sell' },
+  { id: 'mine', label: 'Your requests' },
+] as const;
+type Mode = (typeof MODES)[number]['id'];
+
+const CATEGORY_OPTIONS = [
+  { id: 'any', label: 'Any category' },
+  ...categories.filter((c) => c.id !== 'all'),
+];
+
+function categoryLabel(id: string) {
+  return CATEGORY_OPTIONS.find((c) => c.id === id)?.label ?? 'Any category';
+}
+
+function RequestCard({ request }: { request: PartRequest }) {
+  const router = useRouter();
+  const allListings = useAllListings();
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const isOpen = request.status === 'Open';
+  // Requests on your account keep their photos private, so those are shown through short-lived links.
+  const signedUrls = useSignedRequestPhotoUrls(request.remote ? (request.photos ?? []) : []);
+  const photoSources = request.remote
+    ? signedUrls.filter((uri) => uri !== '').map((uri) => ({ uri }))
+    : (request.photos ?? []).map((name) => ({ uri: photoUri(name) }));
+  const matches = isOpen ? matchListings(request, allListings) : [];
+
+  const confirmDelete = () =>
+    showAlert('Delete request?', `“${request.partName}” will be removed.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          const problem = await deleteRequest(request);
+          if (problem) showAlert('Couldn’t delete the request', problem);
+        },
+      },
+    ]);
+
+  return (
+    <View style={[styles.card, !isOpen && styles.cardClosed]}>
+      <View style={styles.cardTop}>
+        <Text style={styles.cardTitle} numberOfLines={2}>
+          {request.partName}
+        </Text>
+        <Stamp label={request.status.toUpperCase()} color={isOpen ? Colors.header : Colors.muted} />
+      </View>
+      <Text style={styles.cardMeta}>
+        {[request.vehicle || null, request.source === 'Any' ? 'Local or import' : request.source, categoryLabel(request.categoryId)]
+          .filter(Boolean)
+          .join(' · ')}
+      </Text>
+      {request.notes !== '' && (
+        <Text style={styles.cardNotes} numberOfLines={2}>
+          {request.notes}
+        </Text>
+      )}
+      {photoSources.length > 0 && (
+        <View style={styles.thumbs}>
+          {photoSources.map((source, index) => (
+            <Pressable key={index} style={({ pressed }) => [styles.thumb, pressed && styles.pressed]} onPress={() => setViewerIndex(index)}>
+              <Image source={source} style={styles.thumbImage} contentFit="cover" />
+            </Pressable>
+          ))}
+        </View>
+      )}
+      <Text style={styles.cardTime}>{timeAgo(request.createdAt)}</Text>
+
+      {isOpen && (
+        <View style={styles.matches}>
+          <Text style={styles.matchesTitle}>
+            {matches.length === 0
+              ? 'No matching listings yet'
+              : `${matches.length} possible match${matches.length === 1 ? '' : 'es'}`}
+          </Text>
+          {matches.length === 0 && (
+            <Text style={styles.matchesEmpty}>New listings that fit will appear here as they’re posted.</Text>
+          )}
+          {matches.slice(0, 3).map((listing) => (
+            <Pressable
+              key={listing.id}
+              style={({ pressed }) => [styles.matchRow, pressed && styles.pressed]}
+              onPress={() => router.push(`/listing/${listing.id}`)}>
+              <Text style={styles.matchTitle} numberOfLines={1}>
+                {listing.title}
+              </Text>
+              <Text style={styles.matchPrice}>${listing.price}</Text>
+              <Text style={styles.matchArrow}>→</Text>
+            </Pressable>
+          ))}
+          {matches.length > 3 && <Text style={styles.matchesEmpty}>+{matches.length - 3} more on Home</Text>}
+        </View>
+      )}
+
+      <View style={styles.actions}>
+        <Pressable
+          hitSlop={8}
+          onPress={async () => {
+            const problem = await toggleRequest(request);
+            if (problem) showAlert('Couldn’t update the request', problem);
+          }}>
+          <Text style={styles.actionText}>{isOpen ? 'Close request' : 'Reopen'}</Text>
+        </Pressable>
+        <Pressable hitSlop={8} onPress={confirmDelete}>
+          <Text style={[styles.actionText, styles.actionDanger]}>Delete</Text>
+        </Pressable>
+      </View>
+      <PhotoViewer sources={photoSources} index={viewerIndex} onClose={() => setViewerIndex(null)} />
+    </View>
+  );
+}
+
+function SellOption({
+  title,
+  detail,
+  onPress,
+}: {
+  title: string;
+  detail: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable style={({ pressed }) => [styles.sellRow, pressed && styles.pressed]} onPress={onPress}>
+      <View style={styles.sellText}>
+        <Text style={styles.sellTitle}>{title}</Text>
+        <Text style={styles.sellDetail}>{detail}</Text>
+      </View>
+      <Text style={styles.sellArrow}>→</Text>
+    </Pressable>
+  );
+}
+
+function SellPanel() {
+  const router = useRouter();
+  const supplier = useSupplier();
+  const supplierStatus = supplier?.status;
+  const approved = isApprovedSupplier(supplier);
+  const listingCount = useMyListings().filter((l) => !l.sold).length;
+
+  return (
+    <View>
+      <SellOption
+        title="Local stock"
+        detail="Parts you have in Zimbabwe. Buyers collect, or you deliver."
+        onPress={() => router.push('/list-part?origin=local')}
+      />
+      <Stitch color={Colors.muted} thickness={1} />
+      {approved && supplier.country !== 'Zimbabwe' ? (
+        <SellOption
+          title={`Import from ${supplier.country}`}
+          detail={`Ships from ${supplier.city}, about ${supplier.leadTime} to Zimbabwe.`}
+          onPress={() => router.push('/list-part?origin=import')}
+        />
+      ) : approved ? (
+        <SellOption
+          title="Verified wholesale stock"
+          detail={`Listed as ${supplier.business}. Your listings show a Verified tag.`}
+          onPress={() => router.push('/list-part')}
+        />
+      ) : supplierStatus === 'pending' ? (
+        <SellOption
+          title="Supplier application under review"
+          detail="We check every supplier by hand. You can still edit your details."
+          onPress={() => router.push('/become-supplier')}
+        />
+      ) : supplierStatus === 'rejected' ? (
+        <SellOption
+          title="Supplier application not approved"
+          detail="Update your details and send it again."
+          onPress={() => router.push('/become-supplier')}
+        />
+      ) : (
+        <SellOption
+          title="Become a verified supplier"
+          detail="For a local wholesaler or an overseas supplier. Once approved, your listings show a Verified tag."
+          onPress={() => router.push('/become-supplier')}
+        />
+      )}
+      <Stitch color={Colors.muted} thickness={1} />
+      <SellOption
+        title="Your listings"
+        detail={listingCount === 0 ? 'Nothing listed yet.' : `${listingCount} ${listingCount === 1 ? 'part' : 'parts'} listed on this device.`}
+        onPress={() => router.push('/my-listings')}
+      />
+    </View>
+  );
+}
+
+export default function RequestScreen() {
+  const router = useRouter();
+  const params = useLocalSearchParams<{ view?: string }>();
+  const requests = useMyRequests();
+  const [mode, setMode] = useState<Mode>('new');
+  const [partName, setPartName] = useState('');
+  const [vehicle, setVehicle] = useState('');
+  const [notes, setNotes] = useState('');
+  const [photos, setPhotos] = useState<string[]>([]);
+  const session = useSession();
+  const [busy, setBusy] = useState(false);
+  const [source, setSource] = useState<RequestSource>('Any');
+  const [categoryId, setCategoryId] = useState('any');
+
+  useEffect(() => {
+    if (params.view === 'mine' || params.view === 'sell') {
+      // Route params are external state; this mirrors a one-shot navigation hint into local state.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setMode(params.view);
+      // One-shot signal: clear it so it can't override the user's later tab choice.
+      router.setParams({ view: undefined });
+    }
+  }, [params.view, router]);
+
+  const handleSubmit = async () => {
+    if (busy) return;
+    if (partName.trim().length < 2) {
+      showAlert('Add a part name', 'Tell sellers what you’re looking for first.');
+      return;
+    }
+    if (backendEnabled && !session) {
+      showAlert('Sign in to post a request', 'Requests are saved on your account so they stay with you.', [
+        { text: 'Not now', style: 'cancel' },
+        { text: 'Sign in', onPress: () => router.push('/sign-in') },
+      ]);
+      return;
+    }
+    setBusy(true);
+    const problem = await createRequest({
+      partName: partName.trim(),
+      vehicle: vehicle.trim(),
+      source,
+      categoryId,
+      notes: notes.trim(),
+      photos,
+    });
+    setBusy(false);
+    if (problem) {
+      showAlert('Couldn’t post your request', problem);
+      return;
+    }
+    success();
+    setPartName('');
+    setVehicle('');
+    setNotes('');
+    setPhotos([]);
+    setSource('Any');
+    setCategoryId('any');
+    setMode('mine');
+  };
+
+  const openCount = requests.filter((r) => r.status === 'Open').length;
+  const subtitle =
+    mode === 'sell'
+      ? 'List a part for buyers across Zimbabwe, from your shelf or from overseas.'
+      : mode === 'mine' && requests.length > 0
+        ? `${openCount} open`
+        : 'Post what you need. We’ll match it against listings, local or overseas.';
+
+  return (
+    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+        <PageHeader title={mode === 'sell' ? 'Got a part\nto sell?' : 'Can’t find\nthe part?'} subtitle={subtitle} />
+
+        <View style={styles.tabs}>
+          <CategoryTabs categories={MODES} value={mode} onChange={(id) => setMode(id as Mode)} />
+        </View>
+
+        <View style={styles.form}>
+          {mode === 'sell' ? (
+            <SellPanel />
+          ) : mode === 'new' ? (
+            <>
+              <View style={styles.field}>
+                <Text style={styles.label}>Part name</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Front brake pads"
+                  placeholderTextColor={Colors.placeholder}
+                  value={partName}
+                  onChangeText={setPartName}
+                />
+              </View>
+
+              <View style={styles.field}>
+                <Text style={styles.label}>Vehicle make, model and year</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Toyota Hilux 2018"
+                  placeholderTextColor={Colors.placeholder}
+                  value={vehicle}
+                  onChangeText={setVehicle}
+                />
+              </View>
+
+              <View style={styles.field}>
+                <Text style={styles.label}>Category</Text>
+                <ChipSelect options={CATEGORY_OPTIONS} value={categoryId} onChange={setCategoryId} />
+              </View>
+
+              <View style={styles.field}>
+                <Text style={styles.label}>Where from</Text>
+                <SegmentedControl options={SOURCES} value={source} onChange={setSource} />
+              </View>
+
+              <View style={styles.field}>
+                <Text style={styles.label}>Photos (optional)</Text>
+                <PhotoPicker photos={photos} onChange={setPhotos} max={3} hint="The old part, or the number stamped on it" />
+              </View>
+
+              <View style={styles.field}>
+                <Text style={styles.label}>Notes (optional)</Text>
+                <TextInput
+                  style={[styles.input, styles.textarea]}
+                  placeholder="Left side, ceramic, OEM only"
+                  placeholderTextColor={Colors.placeholder}
+                  value={notes}
+                  onChangeText={setNotes}
+                  multiline
+                />
+              </View>
+
+              <Button label={busy ? 'One moment…' : 'Post request'} variant="primary" onPress={handleSubmit} />
+            </>
+          ) : requests.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>No requests yet</Text>
+              <Text style={styles.emptyText}>Post one and any matching listings will show up here.</Text>
+              <View style={styles.emptyButton}>
+                <Button label="Post a request" variant="outline" onPress={() => setMode('new')} />
+              </View>
+            </View>
+          ) : (
+            requests.map((request, index) => (
+              <View key={request.id}>
+                {index > 0 && (
+                  <View style={styles.cardGap}>
+                    <Stitch />
+                  </View>
+                )}
+                <RequestCard request={request} />
+              </View>
+            ))
+          )}
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  body: {
+    paddingBottom: Spacing.xxxl,
+  },
+  tabs: {
+    paddingLeft: Spacing.xl,
+    marginTop: Spacing.sm,
+  },
+  form: {
+    padding: Spacing.xl,
+    gap: Spacing.xl,
+  },
+  pressed: {
+    opacity: 0.6,
+  },
+  field: {
+    gap: Spacing.xs,
+  },
+  label: {
+    fontFamily: Fonts.bodyBold,
+    fontSize: Type.small,
+    color: Colors.muted,
+  },
+  input: {
+    borderBottomWidth: 1.5,
+    borderBottomColor: Colors.ink,
+    paddingVertical: Spacing.sm,
+    fontFamily: Fonts.bodyRegular,
+    fontSize: Type.body,
+    color: Colors.ink,
+  },
+  textarea: {
+    minHeight: 64,
+    textAlignVertical: 'top',
+  },
+  sellRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingVertical: Spacing.lg,
+  },
+  sellText: {
+    flex: 1,
+    gap: 2,
+  },
+  sellTitle: {
+    fontFamily: Fonts.headingBold,
+    fontSize: Type.title,
+    color: Colors.ink,
+  },
+  sellDetail: {
+    fontFamily: Fonts.bodyRegular,
+    fontSize: Type.small,
+    lineHeight: 19,
+    color: Colors.muted,
+  },
+  sellArrow: {
+    fontFamily: Fonts.bodyBold,
+    fontSize: Type.body,
+    color: Colors.header,
+  },
+  cardGap: {
+    marginVertical: Spacing.xl,
+  },
+  card: {
+    gap: Spacing.sm,
+  },
+  cardClosed: {
+    opacity: 0.6,
+  },
+  cardTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+  },
+  cardTitle: {
+    flex: 1,
+    fontFamily: Fonts.headingBold,
+    fontSize: Type.title,
+    lineHeight: 24,
+    color: Colors.ink,
+  },
+  cardMeta: {
+    fontFamily: Fonts.bodyMedium,
+    fontSize: Type.small,
+    color: Colors.muted,
+  },
+  cardNotes: {
+    fontFamily: Fonts.bodyRegular,
+    fontSize: Type.small,
+    color: Colors.ink,
+    lineHeight: 19,
+  },
+  thumbs: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginTop: Spacing.xs,
+  },
+  thumb: {
+    width: 60,
+    height: 60,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: '#EADFC8',
+  },
+  thumbImage: {
+    width: '100%',
+    height: '100%',
+  },
+  cardTime: {
+    fontFamily: Fonts.bodyRegular,
+    fontSize: Type.caption,
+    color: Colors.muted,
+  },
+  matches: {
+    gap: Spacing.xs,
+    marginTop: Spacing.xs,
+    paddingLeft: Spacing.md,
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.accent,
+  },
+  matchesTitle: {
+    fontFamily: Fonts.headingSemiBold,
+    fontSize: Type.small,
+    color: Colors.ink,
+  },
+  matchesEmpty: {
+    fontFamily: Fonts.bodyRegular,
+    fontSize: Type.small,
+    color: Colors.muted,
+  },
+  matchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.xs,
+  },
+  matchTitle: {
+    flex: 1,
+    fontFamily: Fonts.bodyMedium,
+    fontSize: Type.small,
+    color: Colors.ink,
+  },
+  matchPrice: {
+    fontFamily: Fonts.headingBold,
+    fontSize: Type.body,
+    color: Colors.ink,
+  },
+  matchArrow: {
+    fontFamily: Fonts.bodyBold,
+    fontSize: Type.small,
+    color: Colors.header,
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: Spacing.xl,
+    marginTop: Spacing.xs,
+  },
+  actionText: {
+    fontFamily: Fonts.bodyBold,
+    fontSize: Type.small,
+    color: Colors.header,
+    textDecorationLine: 'underline',
+  },
+  actionDanger: {
+    color: Colors.danger,
+  },
+  emptyState: {
+    gap: Spacing.xs,
+  },
+  emptyTitle: {
+    fontFamily: Fonts.headingBold,
+    fontSize: Type.title,
+    color: Colors.ink,
+  },
+  emptyText: {
+    fontFamily: Fonts.bodyRegular,
+    fontSize: Type.small,
+    lineHeight: 19,
+    color: Colors.muted,
+  },
+  emptyButton: {
+    marginTop: Spacing.lg,
+    alignSelf: 'stretch',
+  },
+});
