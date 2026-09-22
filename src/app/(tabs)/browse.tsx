@@ -1,18 +1,26 @@
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { PageHeader } from '@/components/page-header';
 import { SearchBar } from '@/components/search-bar';
 import { Stitch } from '@/components/stitch';
 import { categories } from '@/data/categories';
+import { refreshAll } from '@/lib/refresh';
 import { useAllListings } from '@/store/my-listings';
 import { Colors, Fonts, Spacing, Type } from '@/theme';
 
 export default function BrowseScreen() {
   const router = useRouter();
   const [search, setSearch] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
   const listings = useAllListings();
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshAll();
+    }, []),
+  );
 
   const query = search.trim().toLowerCase();
   const filtered = categories.filter((cat) => query === '' || cat.label.toLowerCase().includes(query));
@@ -21,7 +29,21 @@ export default function BrowseScreen() {
     categoryId === 'all' ? listings.length : listings.filter((l) => l.categoryId === categoryId).length;
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          tintColor={Colors.header}
+          onRefresh={async () => {
+            setRefreshing(true);
+            await refreshAll();
+            setRefreshing(false);
+          }}
+        />
+      }>
       <PageHeader title="Browse by part" subtitle="Local sellers, plus imports from Dubai and China.">
         <View style={styles.search}>
           <SearchBar placeholder="Search a category" value={search} onChangeText={setSearch} />

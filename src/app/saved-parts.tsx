@@ -1,7 +1,10 @@
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { ListingCard } from '@/components/listing-card';
+import { refreshAll } from '@/lib/refresh';
 import { useAllListings } from '@/store/my-listings';
 import { useSavedIds } from '@/store/saved-listings';
 import { Colors, Fonts, Spacing, Type } from '@/theme';
@@ -10,6 +13,13 @@ export default function SavedPartsScreen() {
   const savedIds = useSavedIds();
   const allListings = useAllListings();
   const saved = allListings.filter((item) => savedIds.has(item.id));
+  const [refreshing, setRefreshing] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshAll();
+    }, []),
+  );
 
   return (
     <View style={styles.screen}>
@@ -21,6 +31,17 @@ export default function SavedPartsScreen() {
         numColumns={2}
         columnWrapperStyle={styles.gridRow}
         contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            tintColor={Colors.header}
+            onRefresh={async () => {
+              setRefreshing(true);
+              await refreshAll();
+              setRefreshing(false);
+            }}
+          />
+        }
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>Nothing saved yet</Text>

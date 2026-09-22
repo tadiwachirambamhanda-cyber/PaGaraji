@@ -1,5 +1,5 @@
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Button } from '@/components/button';
@@ -11,7 +11,13 @@ import { categories } from '@/data/categories';
 import { success } from '@/lib/haptics';
 import { backendEnabled } from '@/lib/supabase';
 import { useSession } from '@/store/auth';
-import { saveSupplier, useSupplier, type SupplierCountry, type SupplierStatus } from '@/store/supplier';
+import {
+  refreshSupplier,
+  saveSupplier,
+  useSupplier,
+  type SupplierCountry,
+  type SupplierStatus,
+} from '@/store/supplier';
 import { showAlert } from '@/lib/alert';
 import { Colors, Fonts, Spacing, Type } from '@/theme';
 
@@ -50,6 +56,14 @@ const STATUS_STAMP: Record<SupplierStatus, { label: string; color: string; note:
 export default function BecomeSupplierScreen() {
   const router = useRouter();
   const existing = useSupplier();
+
+  // The status on this screen (pending/approved/rejected) changes from a review you can't see
+  // happen, so check again every time you come back to it rather than only on the first load.
+  useFocusEffect(
+    useCallback(() => {
+      refreshSupplier();
+    }, []),
+  );
   const [business, setBusiness] = useState(existing?.business ?? '');
   const [country, setCountry] = useState<SupplierCountry>(existing?.country ?? 'Zimbabwe');
   const [city, setCity] = useState(existing?.city ?? '');

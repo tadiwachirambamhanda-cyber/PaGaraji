@@ -1,15 +1,24 @@
-import { useRouter } from 'expo-router';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { PlusIcon } from '@/components/icons';
 import { ScreenHeader } from '@/components/screen-header';
 import { ListingCard } from '@/components/listing-card';
+import { refreshAll } from '@/lib/refresh';
 import { useMyListings } from '@/store/my-listings';
 import { Colors, Fonts, Spacing, Type } from '@/theme';
 
 export default function MyListingsScreen() {
   const router = useRouter();
   const myListings = useMyListings();
+  const [refreshing, setRefreshing] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshAll();
+    }, []),
+  );
 
   return (
     <View style={styles.screen}>
@@ -29,6 +38,17 @@ export default function MyListingsScreen() {
         numColumns={2}
         columnWrapperStyle={styles.gridRow}
         contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            tintColor={Colors.header}
+            onRefresh={async () => {
+              setRefreshing(true);
+              await refreshAll();
+              setRefreshing(false);
+            }}
+          />
+        }
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>Nothing listed yet</Text>

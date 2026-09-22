@@ -1,7 +1,17 @@
 import { Image } from 'expo-image';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
 import { Button } from '@/components/button';
 import { CategoryTabs } from '@/components/category-tabs';
@@ -15,6 +25,7 @@ import { Stitch } from '@/components/stitch';
 import { categories } from '@/data/categories';
 import { success } from '@/lib/haptics';
 import { photoUri } from '@/lib/photos';
+import { refreshAll } from '@/lib/refresh';
 import { createRequest, deleteRequest, toggleRequest } from '@/lib/request-actions';
 import { useSignedRequestPhotoUrls } from '@/lib/signed-urls';
 import { backendEnabled } from '@/lib/supabase';
@@ -230,6 +241,13 @@ export default function RequestScreen() {
   const [busy, setBusy] = useState(false);
   const [source, setSource] = useState<RequestSource>('Any');
   const [categoryId, setCategoryId] = useState('any');
+  const [refreshing, setRefreshing] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshAll();
+    }, []),
+  );
 
   useEffect(() => {
     if (params.view === 'mine' || params.view === 'sell') {
@@ -288,7 +306,20 @@ export default function RequestScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={styles.body}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            tintColor={Colors.header}
+            onRefresh={async () => {
+              setRefreshing(true);
+              await refreshAll();
+              setRefreshing(false);
+            }}
+          />
+        }>
         <PageHeader title={mode === 'sell' ? 'Got a part\nto sell?' : 'Can’t find\nthe part?'} subtitle={subtitle} />
 
         <View style={styles.tabs}>

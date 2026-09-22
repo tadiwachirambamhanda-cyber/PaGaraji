@@ -1,14 +1,23 @@
-import { useRouter } from 'expo-router';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { Stitch } from '@/components/stitch';
 import { useNotifications } from '@/lib/notifications';
+import { refreshAll } from '@/lib/refresh';
 import { Colors, Fonts, Spacing, Type } from '@/theme';
 
 export default function NotificationsScreen() {
   const router = useRouter();
   const notifications = useNotifications();
+  const [refreshing, setRefreshing] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshAll();
+    }, []),
+  );
 
   return (
     <View style={styles.screen}>
@@ -18,6 +27,17 @@ export default function NotificationsScreen() {
         data={notifications}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            tintColor={Colors.header}
+            onRefresh={async () => {
+              setRefreshing(true);
+              await refreshAll();
+              setRefreshing(false);
+            }}
+          />
+        }
         ItemSeparatorComponent={() => <Stitch color={Colors.muted} thickness={1} />}
         ListEmptyComponent={
           <View style={styles.emptyState}>

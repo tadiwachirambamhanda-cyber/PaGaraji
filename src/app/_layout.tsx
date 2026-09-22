@@ -1,3 +1,6 @@
+// Keeps listings, requests and supplier status fresh whenever the app returns to the foreground.
+import '@/lib/refresh';
+
 import { Baloo2_500Medium, Baloo2_600SemiBold, Baloo2_700Bold } from '@expo-google-fonts/baloo-2';
 import { Manrope_400Regular, Manrope_500Medium, Manrope_700Bold } from '@expo-google-fonts/manrope';
 import { useFonts } from 'expo-font';
@@ -5,8 +8,8 @@ import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
-import { useSettingsHydrated } from '@/store/settings';
 import { Platform, StyleSheet, View } from 'react-native';
+import { useSettingsHydrated } from '@/store/settings';
 
 SplashScreen.preventAutoHideAsync();
 

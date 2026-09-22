@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 
 import { ChatIcon, GridIcon, HomeIcon, PlusIcon, UserIcon } from '@/components/icons';
+import { refreshAll } from '@/lib/refresh';
 import { useUnreadCount } from '@/store/conversations';
 import { Colors, Fonts, Type } from '@/theme';
 
@@ -34,6 +35,9 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{ title: 'Home', tabBarIcon: ({ color }) => <HomeIcon size={21} color={String(color)} /> }}
+        // Tapping the Home tab re-fetches too — including when you're already on it, which
+        // useFocusEffect on the screen itself can't catch since focus doesn't change.
+        listeners={{ tabPress: () => refreshAll() }}
       />
       <Tabs.Screen
         name="browse"

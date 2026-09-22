@@ -1,5 +1,5 @@
-import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { Redirect, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { CategoryTabs } from '@/components/category-tabs';
@@ -8,16 +8,18 @@ import { BellIcon, ChevronDownIcon, LocationIcon } from '@/components/icons';
 import { InlineToggle } from '@/components/inline-toggle';
 import { ListingCard } from '@/components/listing-card';
 import { LocationSheet } from '@/components/location-sheet';
+import { Logo } from '@/components/logo';
 import { PageHeader } from '@/components/page-header';
 import { SearchBar } from '@/components/search-bar';
 import { SORT_SHORT, SortSheet, type SortKey } from '@/components/sort-sheet';
 import { Stitch } from '@/components/stitch';
 import { ToggleChip } from '@/components/toggle-chip';
 import { categories } from '@/data/categories';
+import { tapLight } from '@/lib/haptics';
+import { refreshAll } from '@/lib/refresh';
 import { useAllListings } from '@/store/my-listings';
 import { saveProfile, useProfile } from '@/store/profile';
 import { addRecentSearch, clearRecentSearches, useRecentSearches } from '@/store/recent-searches';
-import { refreshRemoteListings } from '@/store/remote-listings';
 import { useSettings, useSettingsHydrated } from '@/store/settings';
 import { useVehicle } from '@/store/vehicle';
 import { Colors, Fonts, Spacing, Type } from '@/theme';
@@ -57,6 +59,20 @@ export default function HomeScreen() {
     }
   }, [params.category, router]);
 
+  // Listings, requests and supplier status can change from outside this phone, so re-fetch them
+  // every time you land back on Home rather than only when the app first opens.
+  useFocusEffect(
+    useCallback(() => {
+      refreshAll();
+    }, []),
+  );
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refreshAll();
+    setRefreshing(false);
+  }, []);
+
   const query = search.trim().toLowerCase();
   const categoryAndSearchFiltered = listings.filter((item) => {
     const matchesCategory = selectedCategory === 'all' || item.categoryId === selectedCategory;
@@ -84,17 +100,7 @@ export default function HomeScreen() {
         columnWrapperStyle={styles.gridRow}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            tintColor={Colors.header}
-            onRefresh={async () => {
-              setRefreshing(true);
-              await refreshRemoteListings();
-              setRefreshing(false);
-            }}
-          />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} tintColor={Colors.header} onRefresh={handleRefresh} />}
         ListHeaderComponent={
           <>
             <PageHeader
@@ -102,14 +108,25 @@ export default function HomeScreen() {
               title="What are you fixing today?"
               top={
                 <View style={styles.topRow}>
-                  <Pressable style={styles.location} hitSlop={8} onPress={() => setLocationVisible(true)}>
-                    <LocationIcon size={16} color={Colors.header} />
-                    <Text style={styles.locationText}>{profile.city}</Text>
-                    <ChevronDownIcon size={13} color={Colors.header} />
+                  <Pressable
+                    accessibilityLabel="Refresh"
+                    hitSlop={10}
+                    onPress={() => {
+                      tapLight();
+                      handleRefresh();
+                    }}>
+                    <Logo size={20} />
                   </Pressable>
-                  <Pressable accessibilityLabel="Notifications" hitSlop={10} onPress={() => router.push('/notifications')}>
-                    <BellIcon size={22} color={Colors.ink} />
-                  </Pressable>
+                  <View style={styles.topRowRight}>
+                    <Pressable style={styles.location} hitSlop={8} onPress={() => setLocationVisible(true)}>
+                      <LocationIcon size={16} color={Colors.header} />
+                      <Text style={styles.locationText}>{profile.city}</Text>
+                      <ChevronDownIcon size={13} color={Colors.header} />
+                    </Pressable>
+                    <Pressable accessibilityLabel="Notifications" hitSlop={10} onPress={() => router.push('/notifications')}>
+                      <BellIcon size={22} color={Colors.ink} />
+                    </Pressable>
+                  </View>
                 </View>
               }>
               <View style={styles.search}>
@@ -236,6 +253,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  topRowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.lg,
   },
   location: {
     flexDirection: 'row',

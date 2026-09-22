@@ -1,8 +1,10 @@
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Stitch } from '@/components/stitch';
+import { refreshAll } from '@/lib/refresh';
 import { backendEnabled } from '@/lib/supabase';
 import { signOut, useSession } from '@/store/auth';
 import { useMyListings } from '@/store/my-listings';
@@ -42,6 +44,12 @@ export default function ProfileScreen() {
   const supplier = useSupplier();
   const vehicle = useVehicle();
   const session = useSession();
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshAll();
+    }, []),
+  );
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={[styles.content, { paddingTop: insets.top + Spacing.lg }]}>
