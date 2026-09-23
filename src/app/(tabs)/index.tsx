@@ -362,6 +362,8 @@ function createStyles(Colors: ColorPalette) {
     height: 56,
     borderRadius: Radii.md,
     backgroundColor: Colors.header,
+    borderWidth: 1.5,
+    borderColor: Colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000000',

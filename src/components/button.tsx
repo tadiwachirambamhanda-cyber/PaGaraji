@@ -55,7 +55,12 @@ function createStyles(Colors: ColorPalette) {
   });
 
   const variantStyles = StyleSheet.create({
-    primary: { backgroundColor: Colors.header },
+    // The border is the same trick the active chips/segmented-control/stamps
+    // already use: `ink` on top of `header` is invisible in light mode (both are
+    // the same charcoal) but a crisp light edge in dark mode, since `ink` flips
+    // light while `header` stays a dark fill — gives the button a clear outline
+    // instead of a flat block that barely reads against a dark screen.
+    primary: { backgroundColor: Colors.header, borderWidth: 1.5, borderColor: Colors.ink },
     secondary: { backgroundColor: Colors.accent },
     outline: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: Colors.ink },
     whatsapp: { backgroundColor: Colors.whatsapp },
@@ -63,7 +68,10 @@ function createStyles(Colors: ColorPalette) {
 
   const variantLabelStyles = StyleSheet.create({
     primary: { color: '#FFFFFF' },
-    secondary: { color: Colors.ink },
+    // Sits on the constant accent fill, not the screen background — needs the
+    // matching constant ink (`accentInk`), not `ink` (which now flips light in
+    // dark mode and would wash out against the still-orange fill).
+    secondary: { color: Colors.accentInk },
     outline: { color: Colors.ink },
     whatsapp: { color: '#FFFFFF' },
   });

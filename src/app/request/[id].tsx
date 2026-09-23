@@ -6,6 +6,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { Button } from '@/components/button';
 import { StarIcon } from '@/components/icons';
 import { PhotoViewer } from '@/components/photo-viewer';
+import { RatePersonSheet } from '@/components/rate-person-sheet';
 import { ScreenHeader } from '@/components/screen-header';
 import { Stamp } from '@/components/stamp';
 import { Stitch } from '@/components/stitch';
@@ -14,6 +15,7 @@ import { success, tapLight } from '@/lib/haptics';
 import {
   acceptOffer,
   cancelMatch,
+  completeMatch,
   counterOffer,
   fetchMyOffer,
   fetchOffersForRequest,
@@ -24,12 +26,13 @@ import {
 } from '@/lib/offers';
 import { fetchCategoryPriceGuidance, type PriceGuidance } from '@/lib/price-guidance';
 import { presenceLabel } from '@/lib/presence';
-import { fetchBuyerRating } from '@/lib/reviews';
+import { fetchBuyerRating, fetchMyReview, submitReview } from '@/lib/reviews';
 import { useSignedRequestPhotoUrls } from '@/lib/signed-urls';
 import { useSession } from '@/store/auth';
 import { useConversationForRequest } from '@/store/conversations';
-import { useMyRequests } from '@/store/my-requests';
+import { useMyRequests, type PartRequest } from '@/store/my-requests';
 import { useOpenRequests } from '@/store/open-requests';
+import { fetchRequestById } from '@/store/remote-requests';
 import { initialsOf } from '@/store/profile';
 import { Fonts, Radii, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
@@ -152,9 +155,19 @@ export default function RequestDetailScreen() {
   const session = useSession();
   const myRequests = useMyRequests();
   const openRequests = useOpenRequests();
-  const request = myRequests.find((r) => r.id === id) ?? openRequests.find((r) => r.id === id);
+  const localRequest = myRequests.find((r) => r.id === id) ?? openRequests.find((r) => r.id === id);
+  const [remoteRequest, setRemoteRequest] = useState<PartRequest | null>(null);
+  const request = localRequest ?? remoteRequest ?? undefined;
   const isOwn = myRequests.some((r) => r.id === id);
   const myConversation = useConversationForRequest(id);
+
+  // Neither of the two local caches above cover a seller revisiting their own Matched
+  // or Closed deal (it's not "theirs" and it's no longer Open) — fall back to fetching
+  // it directly, which RLS permits for exactly that case.
+  useEffect(() => {
+    if (!id || localRequest || remoteRequest) return;
+    fetchRequestById(id).then(setRemoteRequest);
+  }, [id, localRequest, remoteRequest]);
 
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [offers, setOffers] = useState<RequestOffer[]>([]);
@@ -163,6 +176,8 @@ export default function RequestDetailScreen() {
   const [countering, setCountering] = useState<string | null>(null);
   const [respondingToCounter, setRespondingToCounter] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const [rateSheetOpen, setRateSheetOpen] = useState(false);
   // undefined: not checked yet. null: checked, no offer of yours exists.
   const [myOffer, setMyOffer] = useState<RequestOffer | null | undefined>(undefined);
   const [price, setPrice] = useState('');
@@ -301,6 +316,10 @@ export default function RequestDetailScreen() {
     success();
     if (isOwn) setOffers(await fetchOffersForRequest(request.id));
     else setMyOffer(await fetchMyOffer(request.id));
+    // The fallback fetch below (see the effect near the top) isn't tied into the
+    // myRequests/openRequests refresh cancelMatch() already triggered, so a seller
+    // relying on it would otherwise keep seeing the stale pre-cancel status.
+    if (remoteRequest) setRemoteRequest(await fetchRequestById(request.id));
   };
 
   const confirmCancelMatch = () =>
@@ -309,7 +328,39 @@ export default function RequestDetailScreen() {
       { text: 'Cancel match', style: 'destructive', onPress: cancelMatchConfirmed },
     ]);
 
-  const canCancelMatch = request.status === 'Matched' && (isOwn || myOffer?.status === 'accepted');
+  const completeMatchConfirmed = async () => {
+    if (completing) return;
+    setCompleting(true);
+    const problem = await completeMatch(request.id);
+    setCompleting(false);
+    if (problem) {
+      showAlert('Couldn’t mark this complete', problem);
+      return;
+    }
+    success();
+    // Same staleness issue as cancelMatchConfirmed above — refresh the fallback fetch too.
+    if (remoteRequest) setRemoteRequest(await fetchRequestById(request.id));
+    // Prompt for a rating right away rather than leaving it to the passive banner
+    // in the chat thread — completion is the moment people are most likely to
+    // actually do it. Only for a conversation that exists and isn't rated yet.
+    if (myConversation) {
+      const existing = await fetchMyReview(myConversation.id);
+      if (!existing) setRateSheetOpen(true);
+    }
+  };
+
+  const rateOtherPerson = async (rating: number, comment: string) => {
+    if (!myConversation) return 'Couldn’t find the conversation for this deal.';
+    const problem = await submitReview(myConversation.id, myConversation.otherUserId, rating, comment);
+    if (problem) {
+      showAlert('Couldn’t submit your rating', problem);
+      return problem;
+    }
+    success();
+    return null;
+  };
+
+  const canActOnMatch = request.status === 'Matched' && (isOwn || myOffer?.status === 'accepted');
 
   return (
     <View style={styles.screen}>
@@ -319,10 +370,19 @@ export default function RequestDetailScreen() {
           <Stamp label={request.status.toUpperCase()} color={statusColor(request.status, Colors)} />
           {request.budget !== undefined && <Text style={styles.budget}>Budget: ${request.budget}</Text>}
         </View>
-        {canCancelMatch && (
-          <Pressable hitSlop={8} onPress={confirmCancelMatch} disabled={cancelling}>
-            <Text style={styles.withdrawText}>{cancelling ? 'One moment…' : 'Cancel this match'}</Text>
-          </Pressable>
+        {canActOnMatch && (
+          <View style={styles.matchActions}>
+            <View style={styles.offerAcceptFlex}>
+              <Button
+                label={completing ? 'One moment…' : 'Mark as completed'}
+                variant="primary"
+                onPress={completeMatchConfirmed}
+              />
+            </View>
+            <Pressable hitSlop={8} onPress={confirmCancelMatch} disabled={cancelling}>
+              <Text style={styles.withdrawText}>{cancelling ? '…' : 'Cancel'}</Text>
+            </Pressable>
+          </View>
         )}
         <Text style={styles.meta}>
           {[
@@ -466,6 +526,14 @@ export default function RequestDetailScreen() {
         )}
       </ScrollView>
       <PhotoViewer sources={photoSources} index={viewerIndex} onClose={() => setViewerIndex(null)} />
+      {myConversation && (
+        <RatePersonSheet
+          visible={rateSheetOpen}
+          onClose={() => setRateSheetOpen(false)}
+          personName={myConversation.otherName}
+          onSubmit={rateOtherPerson}
+        />
+      )}
     </View>
   );
 }
@@ -494,6 +562,12 @@ function createStyles(Colors: ColorPalette) {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
+  },
+  matchActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    marginTop: Spacing.xs,
   },
   budget: {
     fontFamily: Fonts.headingBold,
@@ -531,7 +605,7 @@ function createStyles(Colors: ColorPalette) {
     height: 72,
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: '#EADFC8',
+    backgroundColor: Colors.cardImage,
   },
   thumbImage: {
     width: '100%',
@@ -584,6 +658,8 @@ function createStyles(Colors: ColorPalette) {
     height: 36,
     borderRadius: 11,
     backgroundColor: Colors.header,
+    borderWidth: 1.5,
+    borderColor: Colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',

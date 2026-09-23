@@ -11,6 +11,7 @@ import { categories } from '@/data/categories';
 import { showAlert } from '@/lib/alert';
 import { photoUri } from '@/lib/photos';
 import { refreshAll } from '@/lib/refresh';
+import { completeMatch } from '@/lib/offers';
 import { deleteRequest, toggleRequest } from '@/lib/request-actions';
 import { useSignedRequestPhotoUrls } from '@/lib/signed-urls';
 import { timeAgo } from '@/lib/time';
@@ -132,7 +133,13 @@ function RequestCard({ request }: { request: PartRequest }) {
         <Pressable
           hitSlop={8}
           onPress={async () => {
-            const problem = await toggleRequest(request);
+            // A Matched request goes through the validated RPC (same one both
+            // sides of the deal can call from the request detail screen) rather
+            // than the plain Open<->Closed toggle below, which has no notion of
+            // "this request is actually matched" and only ever touched your own
+            // row — a seller marking their own accepted deal done needed the
+            // real thing, not this shortcut.
+            const problem = request.status === 'Matched' ? await completeMatch(request.id) : await toggleRequest(request);
             if (problem) showAlert('Couldn’t update the request', problem);
           }}>
           <Text style={styles.actionText}>

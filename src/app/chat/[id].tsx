@@ -19,7 +19,7 @@ import { LiveLocationPanel } from '@/components/live-location-panel';
 import { RatePersonSheet } from '@/components/rate-person-sheet';
 import { showAlert } from '@/lib/alert';
 import { success, tapLight } from '@/lib/haptics';
-import { markConversationRead, sendChatMessage, useThreadMessages } from '@/lib/messages';
+import { fetchConversationContactPhone, markConversationRead, sendChatMessage, useThreadMessages } from '@/lib/messages';
 import { fetchMyReview, submitReview, type SellerReview } from '@/lib/reviews';
 import { useSession } from '@/store/auth';
 import { refreshConversations, useConversation } from '@/store/conversations';
@@ -41,12 +41,21 @@ export default function ChatThreadScreen() {
   // undefined: not checked yet. null: checked, no review exists yet.
   const [myReview, setMyReview] = useState<SellerReview | null | undefined>(undefined);
   const [rateSheetOpen, setRateSheetOpen] = useState(false);
+  // A listing-based thread already carries the seller's number on the listing itself
+  // (public by design, copied there at posting time); a request-based deal has no such
+  // column anywhere, so it falls back to the participant-scoped RPC for the same number.
+  const [fetchedPhone, setFetchedPhone] = useState('');
   const listRef = useRef<FlatList>(null);
   const messageCount = messages.length;
 
   useEffect(() => {
     if (id) markConversationRead(id);
   }, [id, messageCount]);
+
+  useEffect(() => {
+    if (!conversation || conversation.listingSellerPhone !== '') return;
+    fetchConversationContactPhone(conversation.id).then(setFetchedPhone);
+  }, [conversation]);
 
   // Either side of a thread can now rate the other.
   useEffect(() => {
@@ -68,6 +77,8 @@ export default function ChatThreadScreen() {
     );
   }
 
+  const contactPhone = conversation.listingSellerPhone || fetchedPhone;
+
   const send = async () => {
     const body = draft.trim();
     if (body === '' || sending) return;
@@ -84,7 +95,7 @@ export default function ChatThreadScreen() {
   };
 
   const openWhatsApp = () => {
-    Linking.openURL(`https://wa.me/${conversation.listingSellerPhone}`);
+    Linking.openURL(`https://wa.me/${contactPhone}`);
   };
 
   const rateOtherPerson = async (rating: number, comment: string) => {
@@ -121,7 +132,7 @@ export default function ChatThreadScreen() {
             </Text>
           )}
         </View>
-        {Platform.OS !== 'web' && conversation.listingSellerPhone !== '' && (
+        {Platform.OS !== 'web' && contactPhone !== '' && (
           <Pressable
             style={({ pressed }) => [styles.iconButton, styles.whatsappIcon, pressed && styles.iconButtonPressed]}
             accessibilityLabel="Chat on WhatsApp"
@@ -131,6 +142,14 @@ export default function ChatThreadScreen() {
           </Pressable>
         )}
       </View>
+
+      {conversation.requestId !== null && (
+        <Pressable
+          style={({ pressed }) => [styles.requestLink, pressed && styles.rateBannerPressed]}
+          onPress={() => router.push(`/request/${conversation.requestId}`)}>
+          <Text style={styles.requestLinkText}>View request →</Text>
+        </Pressable>
+      )}
 
       {myReview === null && (
         <Pressable
@@ -289,12 +308,29 @@ function createStyles(Colors: ColorPalette) {
     gap: 6,
     paddingHorizontal: Spacing.xl,
     paddingVertical: Spacing.sm,
-    backgroundColor: '#FBF3DE',
+    // Was a hardcoded light cream that never changed with theme, paired with
+    // `rateBannerText`'s `Colors.ink` — same light-on-light bug as the chat
+    // bubble above. `cardImage` is the token meant to flip.
+    backgroundColor: Colors.cardImage,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
   rateBannerPressed: {
     opacity: 0.7,
+  },
+  // The only route back to this deal's request screen (status, offer, Mark as
+  // completed) once you've left the accept-flow's initial redirect here —
+  // without it a seller who accepted an offer had no way back to complete it.
+  requestLink: {
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  requestLinkText: {
+    fontFamily: Fonts.bodyBold,
+    fontSize: Type.small,
+    color: Colors.ink,
   },
   rateBannerText: {
     fontFamily: Fonts.bodyBold,
@@ -340,10 +376,17 @@ function createStyles(Colors: ColorPalette) {
   },
   bubbleMe: {
     backgroundColor: Colors.header,
+    borderWidth: 1.5,
+    borderColor: Colors.ink,
     borderBottomRightRadius: 4,
   },
+  // Was a hardcoded light tan that never changed with theme, paired with
+  // `bubbleText`'s `Colors.ink` — in dark mode `ink` flips to light cream, so
+  // light-on-light made the other person's messages unreadable. `Colors.card`
+  // is the token actually meant to flip (white in light mode, a dark surface in
+  // dark mode) and pairs correctly with `ink` in both themes.
   bubbleThem: {
-    backgroundColor: '#EBE2CD',
+    backgroundColor: Colors.card,
     borderBottomLeftRadius: 4,
   },
   bubbleText: {

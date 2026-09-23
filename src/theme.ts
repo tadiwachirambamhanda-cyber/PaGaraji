@@ -3,12 +3,18 @@
  * Charcoal + safety orange + warm paper. Barlow for headings and body, Archivo
  * Black reserved for the wordmark only — one loud face, used once, not everywhere.
  *
- * Dark mode (added 2026-09-23): `header`, `accent`/`primary`, `accentInk`/`tagInk`
- * and `whatsapp` are deliberately IDENTICAL in both palettes below — every one of
- * them is only ever used as a filled background (button, avatar, pill, tag) paired
- * with its own contrasting foreground, never as text sitting directly on the
- * screen background, so there's nothing to invert. Everything else (surfaces,
- * text, borders, status colors) does flip. See `useColors()`.
+ * Dark mode (added 2026-09-23, fill-vs-background contrast fixed same day):
+ * `accent`/`primary`, `accentInk`/`tagInk` and `whatsapp` are deliberately
+ * IDENTICAL in both palettes — vibrant/brand colors that read fine as a filled
+ * background against paper OR charcoal, so there's nothing to invert. `header`
+ * is NOT identical: it's a fill too (button/avatar/pill background, paired with
+ * its own contrasting foreground, never text on the plain screen background),
+ * but a dark charcoal fill needs to be LIGHTER than this theme's own near-black
+ * background to still read as a distinct raised surface — using the exact same
+ * value in both themes made every `header`-filled button/avatar/pill nearly
+ * invisible in dark mode (only its white label text stayed visible, floating
+ * with no boundary). Everything else (surfaces, text, borders, status colors)
+ * flips normally. See `useColors()`.
  */
 
 import { useSettings } from '@/store/settings';
@@ -71,7 +77,13 @@ const DarkColors: ColorPalette = {
   background: '#17140F',
   card: '#241F18',
   cardImage: '#2C2620',
-  header: '#211D18',
+  // NOT the same value as light mode, on purpose: `header` fills buttons/avatars/
+  // pills that need to read as a distinct raised surface. In light mode a dark
+  // charcoal fill pops against the light paper background; the identical value
+  // against this theme's near-black background would have almost no contrast,
+  // making the button's shape disappear (only its white text stays visible,
+  // floating with no boundary) — the exact "invisible button" bug this fixes.
+  header: '#3D362C',
   accent: '#FF6A00',
   accentInk: '#211D18',
   primary: '#FF6A00',
@@ -103,9 +115,18 @@ export function useColors(): ColorPalette {
 export const Fonts = {
   // Reserved for the wordmark alone — see components/logo.tsx.
   display: 'ArchivoBlack_400Regular',
-  headingMedium: 'Barlow_600SemiBold',
-  headingSemiBold: 'Barlow_700Bold',
-  headingBold: 'Barlow_800ExtraBold',
+  // Headings/emphasis: Space Grotesk (2026-09-23, replaced Barlow here) — same
+  // clean, utilitarian bones as Barlow but with a bit more technical character,
+  // a step toward the wordmark's Archivo Black without going that loud
+  // everywhere. Tops out at 700 (no 800 weight exists), so `headingSemiBold`
+  // and `headingBold` share the same weight — differentiated by size/context
+  // instead, same as before.
+  headingMedium: 'SpaceGrotesk_600SemiBold',
+  headingSemiBold: 'SpaceGrotesk_700Bold',
+  headingBold: 'SpaceGrotesk_700Bold',
+  // Body text stays Barlow — reads well at small sizes, and keeps one font
+  // doing headings/emphasis and a different one carrying paragraph-length text,
+  // rather than one face for everything.
   bodyRegular: 'Barlow_400Regular',
   bodyMedium: 'Barlow_500Medium',
   bodyBold: 'Barlow_700Bold',

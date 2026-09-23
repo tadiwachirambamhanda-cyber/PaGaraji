@@ -71,10 +71,16 @@ function createStyles(Colors: ColorPalette) {
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  // This whole overlay is a constant black backdrop regardless of app theme (like
+  // any photo viewer), so its own content stays constant too — `counter` used to
+  // reuse `Colors.background` as "a light color" (worked only because light mode's
+  // background happened to be light); once that token became theme-reactive it
+  // would go dark-on-black and vanish in dark mode. `closeText` had the matching
+  // bug against the light `close` circle below, via `Colors.ink`.
   counter: {
     fontFamily: Fonts.bodyBold,
     fontSize: Type.small,
-    color: Colors.background,
+    color: '#F2ECDF',
   },
   close: {
     width: 40,
@@ -87,7 +93,7 @@ function createStyles(Colors: ColorPalette) {
   closeText: {
     fontFamily: Fonts.bodyBold,
     fontSize: Type.body,
-    color: Colors.ink,
+    color: Colors.header,
   },
   pressed: {
     opacity: 0.6,

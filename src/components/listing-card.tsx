@@ -214,6 +214,8 @@ function createStyles(Colors: ColorPalette) {
   },
   pricePill: {
     backgroundColor: Colors.header,
+    borderWidth: 1.5,
+    borderColor: Colors.ink,
     borderRadius: Radii.sm,
     paddingHorizontal: 7,
     paddingVertical: 2,

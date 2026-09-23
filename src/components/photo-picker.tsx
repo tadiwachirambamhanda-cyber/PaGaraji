@@ -118,7 +118,7 @@ function createStyles(Colors: ColorPalette) {
     height: TILE,
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: '#EADFC8',
+    backgroundColor: Colors.cardImage,
   },
   image: {
     width: '100%',

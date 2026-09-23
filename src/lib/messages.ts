@@ -72,6 +72,20 @@ export async function markConversationRead(conversationId: string): Promise<void
 }
 
 /**
+ * The other person's WhatsApp number for this conversation, if they've set one — the
+ * general-purpose version of `listing_seller_phone` (which only ever covers a
+ * listing-based thread). `profile_contacts` itself is locked to its own owner, so this
+ * goes through `conversation_contact_phone`, a narrow RPC that only reveals the other
+ * *participant's* number, never anyone else's.
+ */
+export async function fetchConversationContactPhone(conversationId: string): Promise<string> {
+  if (!supabase) return '';
+  const { data, error } = await supabase.rpc('conversation_contact_phone', { p_conversation_id: conversationId });
+  if (error || !data) return '';
+  return data as string;
+}
+
+/**
  * Loads a thread's messages and keeps them live: new ones (yours or theirs) arrive over
  * Realtime rather than by polling. RLS means this only ever delivers messages from a
  * conversation you're actually part of.

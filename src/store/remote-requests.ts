@@ -104,6 +104,20 @@ if (supabase) {
   });
 }
 
+/**
+ * A single request straight from the server, for viewing one that's neither yours
+ * (`useMyRequests`) nor still Open (`useOpenRequests`) — the case a seller is in once
+ * their accepted offer's request goes Matched or Closed, since it drops out of the open
+ * feed and was never theirs to begin with. The `requests: seller reads via accepted
+ * offer` RLS policy is what makes this resolve for them; anyone else gets nothing back.
+ */
+export async function fetchRequestById(id: string): Promise<PartRequest | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('requests').select('*').eq('id', id).maybeSingle();
+  if (error || !data) return null;
+  return fromRow(data as RequestRow);
+}
+
 function subscribe(listener: () => void) {
   listeners.add(listener);
   return () => listeners.delete(listener);

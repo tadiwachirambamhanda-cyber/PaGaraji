@@ -2,13 +2,8 @@
 import '@/lib/refresh';
 
 import { ArchivoBlack_400Regular } from '@expo-google-fonts/archivo-black';
-import {
-  Barlow_400Regular,
-  Barlow_500Medium,
-  Barlow_600SemiBold,
-  Barlow_700Bold,
-  Barlow_800ExtraBold,
-} from '@expo-google-fonts/barlow';
+import { Barlow_400Regular, Barlow_500Medium, Barlow_700Bold } from '@expo-google-fonts/barlow';
+import { SpaceGrotesk_600SemiBold, SpaceGrotesk_700Bold } from '@expo-google-fonts/space-grotesk';
 import { useFonts } from 'expo-font';
 import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -29,9 +24,9 @@ export default function RootLayout() {
     ArchivoBlack_400Regular,
     Barlow_400Regular,
     Barlow_500Medium,
-    Barlow_600SemiBold,
     Barlow_700Bold,
-    Barlow_800ExtraBold,
+    SpaceGrotesk_600SemiBold,
+    SpaceGrotesk_700Bold,
   });
 
   useEffect(() => {

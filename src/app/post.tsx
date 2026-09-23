@@ -489,6 +489,8 @@ function createStyles(Colors: ColorPalette) {
   },
   demandBanner: {
     backgroundColor: Colors.header,
+    borderWidth: 1.5,
+    borderColor: Colors.accent,
     borderRadius: Radii.md,
     padding: Spacing.lg,
     gap: 4,

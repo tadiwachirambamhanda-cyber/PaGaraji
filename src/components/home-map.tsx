@@ -185,6 +185,8 @@ function createStyles(Colors: ColorPalette) {
     alignItems: 'center',
     gap: 5,
     backgroundColor: Colors.header,
+    borderWidth: 1.5,
+    borderColor: Colors.accent,
     borderRadius: Radii.chip,
     paddingVertical: 8,
     paddingHorizontal: 12,

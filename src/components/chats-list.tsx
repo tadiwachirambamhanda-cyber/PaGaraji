@@ -117,6 +117,8 @@ function createStyles(Colors: ColorPalette) {
     height: 46,
     borderRadius: 14,
     backgroundColor: Colors.header,
+    borderWidth: 1.5,
+    borderColor: Colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
     transform: [{ rotate: '-3deg' }],

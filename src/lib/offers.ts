@@ -197,6 +197,16 @@ export async function cancelMatch(requestId: string): Promise<string | null> {
   return null;
 }
 
+/** Marks a Matched request done — either the buyer or the accepted seller can call this.
+ * Closes the request out without touching the accepted offer, so it stays in Deal History. */
+export async function completeMatch(requestId: string): Promise<string | null> {
+  if (!supabase) return 'Offers aren’t set up yet.';
+  const { error } = await supabase.rpc('complete_matched_request', { p_request_id: requestId });
+  if (error) return error.message;
+  await Promise.all([refreshRemoteRequests(), refreshOpenRequests()]);
+  return null;
+}
+
 export type Deal = {
   requestId: string;
   offerId: string;

@@ -192,7 +192,7 @@ function createStyles(Colors: ColorPalette) {
   },
   stats: {
     flexDirection: 'row',
-    paddingVertical: Spacing.sm,
+    paddingVertical: Spacing.xs,
   },
   stat: {
     flex: 1,
@@ -200,13 +200,13 @@ function createStyles(Colors: ColorPalette) {
   },
   statValue: {
     fontFamily: Fonts.headingBold,
-    fontSize: Type.title,
-    lineHeight: 24,
+    fontSize: Type.body,
+    lineHeight: 19,
     color: Colors.ink,
   },
   statLabel: {
     fontFamily: Fonts.bodyRegular,
-    fontSize: Type.small,
+    fontSize: Type.caption,
     color: Colors.muted,
   },
   menuRow: {

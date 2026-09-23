@@ -2,7 +2,7 @@ import { Tabs } from 'expo-router';
 import { useMemo } from 'react';
 
 import { AppSidebar } from '@/components/app-sidebar';
-import { BellIcon, HomeIcon } from '@/components/icons';
+import { ChatIcon, HomeIcon } from '@/components/icons';
 import { useNotifications } from '@/lib/notifications';
 import { refreshAll } from '@/lib/refresh';
 import { useUnreadCount } from '@/store/conversations';
@@ -55,7 +55,7 @@ export default function TabsLayout() {
           options={{
             title: 'Activity',
             tabBarBadge: activityBadge > 0 ? activityBadge : undefined,
-            tabBarIcon: ({ color }) => <BellIcon size={21} color={String(color)} />,
+            tabBarIcon: ({ color }) => <ChatIcon size={21} color={String(color)} />,
           }}
           listeners={{ tabPress: () => refreshAll() }}
         />
