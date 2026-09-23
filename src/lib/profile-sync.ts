@@ -9,7 +9,7 @@ import { refreshRemoteListings } from '@/store/remote-listings';
 export async function pullProfile(userId: string): Promise<void> {
   if (!supabase) return;
   const [profileResult, contactResult] = await Promise.all([
-    supabase.from('profiles').select('name, city').eq('id', userId).maybeSingle(),
+    supabase.from('profiles').select('name, city, role').eq('id', userId).maybeSingle(),
     supabase.from('profile_contacts').select('whatsapp').eq('user_id', userId).maybeSingle(),
   ]);
   if (profileResult.error || contactResult.error) return;
@@ -19,6 +19,7 @@ export async function pullProfile(userId: string): Promise<void> {
     name: profileResult.data?.name || local.name,
     city: profileResult.data?.city || local.city,
     phone: contactResult.data?.whatsapp || local.phone,
+    role: profileResult.data?.role === 'seller' ? 'seller' : profileResult.data?.role === 'buyer' ? 'buyer' : local.role,
   };
   saveProfile(next);
 
@@ -38,7 +39,7 @@ export async function pushProfile(profile: Profile): Promise<string | null> {
 
   const name = profile.name.trim();
   const [profileResult, contactResult] = await Promise.all([
-    supabase.from('profiles').update({ name, city: profile.city }).eq('id', userId),
+    supabase.from('profiles').update({ name, city: profile.city, role: profile.role }).eq('id', userId),
     supabase.from('profile_contacts').upsert({ user_id: userId, whatsapp: profile.phone }),
   ]);
   const failure = profileResult.error ?? contactResult.error;

@@ -7,10 +7,14 @@ import { ScreenHeader } from '@/components/screen-header';
 import { SegmentedControl } from '@/components/segmented-control';
 import { success } from '@/lib/haptics';
 import { signInWithPassword, signUpWithPassword } from '@/store/auth';
+import type { AccountRole } from '@/store/profile';
 import { Colors, Fonts, Spacing, Type } from '@/theme';
 
 const MODES = ['Sign in', 'Create account'] as const;
 type Mode = (typeof MODES)[number];
+
+const ROLE_CHOICES = ["I'm buying", "I'm selling"] as const;
+type RoleChoice = (typeof ROLE_CHOICES)[number];
 
 const MIN_PASSWORD = 8;
 
@@ -20,6 +24,7 @@ export default function SignInScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [roleChoice, setRoleChoice] = useState<RoleChoice>("I'm buying");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -55,7 +60,8 @@ export default function SignInScreen() {
 
     setBusy(true);
     if (creating) {
-      const result = await signUpWithPassword(name.trim(), trimmedEmail, password);
+      const role: AccountRole = roleChoice === "I'm selling" ? 'seller' : 'buyer';
+      const result = await signUpWithPassword(name.trim(), trimmedEmail, password, role);
       setBusy(false);
       if (result.error) {
         setError(result.error);
@@ -98,6 +104,14 @@ export default function SignInScreen() {
               onChangeText={setName}
               autoComplete="name"
             />
+          </View>
+        )}
+
+        {creating && (
+          <View style={styles.field}>
+            <Text style={styles.label}>Mostly here to...</Text>
+            <SegmentedControl options={ROLE_CHOICES} value={roleChoice} onChange={setRoleChoice} />
+            <Text style={styles.hint}>Just sets what you see first — you can still do both either way.</Text>
           </View>
         )}
 
@@ -158,6 +172,11 @@ const styles = StyleSheet.create({
   label: {
     fontFamily: Fonts.bodyBold,
     fontSize: Type.small,
+    color: Colors.muted,
+  },
+  hint: {
+    fontFamily: Fonts.bodyRegular,
+    fontSize: Type.caption,
     color: Colors.muted,
   },
   input: {

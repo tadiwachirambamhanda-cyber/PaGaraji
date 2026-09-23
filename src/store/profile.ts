@@ -3,10 +3,13 @@ import { useSyncExternalStore } from 'react';
 
 const STORAGE_KEY = 'pagaraji.profile';
 
-export type Profile = { name: string; phone: string; city: string };
+/** Shapes onboarding and which mode a few screens default to — never a hard restriction. */
+export type AccountRole = 'buyer' | 'seller';
+
+export type Profile = { name: string; phone: string; city: string; role: AccountRole };
 
 // Accounts fill this in after sign-in; until then it's a neutral guest.
-const DEFAULT_PROFILE: Profile = { name: 'Guest', phone: '', city: 'Harare' };
+const DEFAULT_PROFILE: Profile = { name: 'Guest', phone: '', city: 'Harare', role: 'buyer' };
 
 let profile: Profile = DEFAULT_PROFILE;
 const listeners = new Set<() => void>();

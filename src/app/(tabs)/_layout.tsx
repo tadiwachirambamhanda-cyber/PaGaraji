@@ -1,12 +1,15 @@
 import { Tabs } from 'expo-router';
 
-import { ChatIcon, GridIcon, HomeIcon, PlusIcon, UserIcon } from '@/components/icons';
+import { BellIcon, HomeIcon, UserIcon } from '@/components/icons';
+import { useNotifications } from '@/lib/notifications';
 import { refreshAll } from '@/lib/refresh';
 import { useUnreadCount } from '@/store/conversations';
 import { Colors, Fonts, Type } from '@/theme';
 
 export default function TabsLayout() {
   const unread = useUnreadCount();
+  const matches = useNotifications().length;
+  const activityBadge = unread + matches;
 
   return (
     <Tabs
@@ -40,16 +43,13 @@ export default function TabsLayout() {
         listeners={{ tabPress: () => refreshAll() }}
       />
       <Tabs.Screen
-        name="browse"
-        options={{ title: 'Browse', tabBarIcon: ({ color }) => <GridIcon size={21} color={String(color)} /> }}
-      />
-      <Tabs.Screen
-        name="request"
-        options={{ title: 'Post', tabBarIcon: ({ color }) => <PlusIcon size={21} color={String(color)} /> }}
-      />
-      <Tabs.Screen
-        name="chats"
-        options={{ title: 'Chats', tabBarBadge: unread > 0 ? unread : undefined, tabBarIcon: ({ color }) => <ChatIcon size={21} color={String(color)} /> }}
+        name="activity"
+        options={{
+          title: 'Activity',
+          tabBarBadge: activityBadge > 0 ? activityBadge : undefined,
+          tabBarIcon: ({ color }) => <BellIcon size={21} color={String(color)} />,
+        }}
+        listeners={{ tabPress: () => refreshAll() }}
       />
       <Tabs.Screen
         name="profile"

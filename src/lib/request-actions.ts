@@ -20,6 +20,9 @@ export type NewRequestFields = {
   photos: string[];
   /** What you're willing to pay. Sellers can see this and offer it, or counter. */
   budget?: number;
+  /** A dropped pin, if you picked one instead of just a city. */
+  latitude?: number;
+  longitude?: number;
 };
 
 /** Every action returns an error message to show, or null on success. */
@@ -57,6 +60,8 @@ export async function createRequest(input: NewRequestFields): Outcome {
     notes: input.notes,
     photos: paths,
     budget: input.budget ?? null,
+    latitude: input.latitude ?? null,
+    longitude: input.longitude ?? null,
   });
   if (error) {
     await removeRequestPhotos(paths);

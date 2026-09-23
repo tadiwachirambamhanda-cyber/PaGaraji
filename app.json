@@ -35,6 +35,12 @@
           "image": "./assets/images/splash-icon-v2.png",
           "imageWidth": 280
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "PaGaraji uses your location to show nearby sellers and requests on the map."
+        }
       ]
     ],
     "experiments": {

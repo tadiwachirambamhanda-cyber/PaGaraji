@@ -32,6 +32,9 @@ export type PartRequest = {
   matchedOfferId?: string;
   /** How many pending offers are waiting on your reply — online requests only. */
   pendingOfferCount?: number;
+  /** A dropped pin, if you picked one when posting — more precise than `location`. */
+  latitude?: number;
+  longitude?: number;
 };
 
 let requests: PartRequest[] = [];

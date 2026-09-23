@@ -26,7 +26,7 @@ export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
   const profile = useProfile();
 
-  const finish = (href: '/' | '/request?view=sell') => {
+  const finish = (href: '/' | '/post?view=sell') => {
     updateSettings({ onboarded: true });
     router.replace(href);
   };
@@ -59,7 +59,7 @@ export default function WelcomeScreen() {
 
       <View style={styles.actions}>
         <Button label="Start browsing" variant="primary" onPress={() => finish('/')} />
-        <Button label="I want to sell parts" variant="outline" onPress={() => finish('/request?view=sell')} />
+        <Button label="I want to sell parts" variant="outline" onPress={() => finish('/post?view=sell')} />
       </View>
     </ScrollView>
   );

@@ -3,7 +3,7 @@ import { useSyncExternalStore } from 'react';
 
 import { pullProfile } from '@/lib/profile-sync';
 import { supabase } from '@/lib/supabase';
-import { resetProfile } from '@/store/profile';
+import { resetProfile, type AccountRole } from '@/store/profile';
 
 export type SignInTarget = { email: string } | { phone: string };
 
@@ -86,9 +86,10 @@ export async function signUpWithPassword(
   name: string,
   email: string,
   password: string,
+  role: AccountRole,
 ): Promise<{ error: string | null; needsConfirmation: boolean }> {
   if (!supabase) return { error: 'Sign-in isn’t set up yet.', needsConfirmation: false };
-  const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { name } } });
+  const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { name, role } } });
   if (error) return { error: friendlyError(error.message), needsConfirmation: false };
   return { error: null, needsConfirmation: data.session === null };
 }

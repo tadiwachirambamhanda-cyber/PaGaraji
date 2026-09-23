@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ArrowLeftIcon, ChatIcon, SendIcon, StarIcon } from '@/components/icons';
+import { LiveLocationPanel } from '@/components/live-location-panel';
 import { RateSellerSheet } from '@/components/rate-seller-sheet';
 import { showAlert } from '@/lib/alert';
 import { success, tapLight } from '@/lib/haptics';
@@ -145,6 +146,8 @@ export default function ChatThreadScreen() {
           </Text>
         </View>
       )}
+
+      <LiveLocationPanel conversationId={conversation.id} myUserId={session?.user.id} otherName={conversation.otherName} />
 
       <FlatList
         ref={listRef}

@@ -1,39 +1,48 @@
 /**
- * Market Bright — the brand theme for the app.
- * Deep teal + sunflower yellow + vivid orange, Baloo 2 headings / Manrope body.
+ * Workshop — the brand theme for the app (replaced Market Bright, 2026-09-23).
+ * Charcoal + safety orange + warm paper. Barlow for headings and body, Archivo
+ * Black reserved for the wordmark only — one loud face, used once, not everywhere.
  */
 
 export const Colors = {
-  background: '#F7F1E3',
+  background: '#F2ECDF',
   card: '#FFFFFF',
-  cardImage: '#FDEBD3',
-  header: '#0E7C7B',
-  accent: '#F5B700',
-  accentInk: '#1A1A1A',
-  primary: '#E8571F',
-  ink: '#1A1A1A',
-  muted: '#5B6664',
+  cardImage: '#E9E0C9',
+  // The dominant UI color: primary buttons, active states, links. Charcoal, not a
+  // hue — Workshop reads as bold hardware, not a colorful marketplace.
+  header: '#211D18',
+  // The one accent. Used for both `accent` (tags, the wordmark's "Pa") and
+  // `primary` (CTA emphasis, unread badges) on purpose — a single strong color,
+  // not several competing ones.
+  accent: '#FF6A00',
+  accentInk: '#211D18',
+  primary: '#FF6A00',
+  ink: '#211D18',
+  muted: '#6B6255',
   // Lighter than `muted` so an empty field never reads as if it were filled in.
-  placeholder: '#8E938C',
-  navMuted: '#B9AE9A',
-  border: '#E6DCC6',
+  placeholder: '#A89C89',
+  navMuted: '#9C9280',
+  border: '#DED2B8',
   // Outline of an unselected choice: visible, but quieter than the ink of a selected one.
-  line: '#CBC2AB',
-  // Origin ink for imports — the brand orange is too light to read as text on cream.
-  importInk: '#B3560F',
-  tagInk: '#3A2A00',
-  success: '#0E7C7B',
-  danger: '#C0392B',
+  line: '#C9BB98',
+  // Origin ink for imports — needs more contrast than the accent alone gives on cream.
+  importInk: '#8C4B14',
+  tagInk: '#211D18',
+  // A muted workshop green — "in stock" label energy, not a generic system green.
+  success: '#3E7D4A',
+  danger: '#B23A2E',
   whatsapp: '#25D366',
 } as const;
 
 export const Fonts = {
-  headingMedium: 'Baloo2_500Medium',
-  headingSemiBold: 'Baloo2_600SemiBold',
-  headingBold: 'Baloo2_700Bold',
-  bodyRegular: 'Manrope_400Regular',
-  bodyMedium: 'Manrope_500Medium',
-  bodyBold: 'Manrope_700Bold',
+  // Reserved for the wordmark alone — see components/logo.tsx.
+  display: 'ArchivoBlack_400Regular',
+  headingMedium: 'Barlow_600SemiBold',
+  headingSemiBold: 'Barlow_700Bold',
+  headingBold: 'Barlow_800ExtraBold',
+  bodyRegular: 'Barlow_400Regular',
+  bodyMedium: 'Barlow_500Medium',
+  bodyBold: 'Barlow_700Bold',
 } as const;
 
 // Six sizes, nothing in between. Pair with Baloo for titles, Manrope for text.
@@ -56,11 +65,12 @@ export const Spacing = {
   xxxl: 32,
 } as const;
 
+// Sharper than Market Bright's squircles — toolbox-label corners, not pebbles.
 export const Radii = {
-  sm: 8,
-  chip: 14,
-  md: 16,
-  lg: 22,
+  sm: 4,
+  chip: 8,
+  md: 10,
+  lg: 14,
   pill: 999,
 } as const;
 

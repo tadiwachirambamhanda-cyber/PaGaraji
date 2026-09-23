@@ -1,4 +1,3 @@
-import { Image } from 'expo-image';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -17,24 +16,22 @@ import {
 import { Button } from '@/components/button';
 import { CategoryTabs } from '@/components/category-tabs';
 import { ChipSelect } from '@/components/chip-select';
-import { PageHeader } from '@/components/page-header';
+import { LocationPickerMap } from '@/components/location-picker-map';
 import { PhotoPicker } from '@/components/photo-picker';
-import { PhotoViewer } from '@/components/photo-viewer';
+import { ScreenHeader } from '@/components/screen-header';
 import { SegmentedControl } from '@/components/segmented-control';
-import { Stamp } from '@/components/stamp';
 import { Stitch } from '@/components/stitch';
 import { categories } from '@/data/categories';
 import { success } from '@/lib/haptics';
-import { photoUri } from '@/lib/photos';
+import type { Coordinate } from '@/lib/location';
 import { refreshAll } from '@/lib/refresh';
-import { createRequest, deleteRequest, toggleRequest } from '@/lib/request-actions';
-import { useSignedRequestPhotoUrls } from '@/lib/signed-urls';
+import { createRequest } from '@/lib/request-actions';
 import { backendEnabled } from '@/lib/supabase';
 import { useSession } from '@/store/auth';
 import { timeAgo } from '@/lib/time';
-import { useAllListings, useMyListings } from '@/store/my-listings';
-import { matchListings, useMyRequests, type PartRequest, type RequestSource } from '@/store/my-requests';
+import { useMyListings } from '@/store/my-listings';
 import { useOpenRequests, useOpenRequestsHydrated } from '@/store/open-requests';
+import { type PartRequest, type RequestSource } from '@/store/my-requests';
 import { isApprovedSupplier, useSupplier } from '@/store/supplier';
 import { showAlert } from '@/lib/alert';
 import { Colors, Fonts, Spacing, Type } from '@/theme';
@@ -44,151 +41,19 @@ const MODES = [
   { id: 'new', label: 'Request' },
   { id: 'sell', label: 'Sell' },
   { id: 'browse', label: 'Open requests' },
-  { id: 'mine', label: 'Your requests' },
 ] as const;
 type Mode = (typeof MODES)[number]['id'];
 
-function statusColor(status: PartRequest['status']) {
-  if (status === 'Open') return Colors.header;
-  if (status === 'Matched') return Colors.primary;
-  return Colors.muted;
-}
-
-const CATEGORY_OPTIONS = [
-  { id: 'any', label: 'Any category' },
-  ...categories.filter((c) => c.id !== 'all'),
-];
+const CATEGORY_OPTIONS = [{ id: 'any', label: 'Any category' }, ...categories.filter((c) => c.id !== 'all')];
 
 function categoryLabel(id: string) {
   return CATEGORY_OPTIONS.find((c) => c.id === id)?.label ?? 'Any category';
 }
 
-function RequestCard({ request }: { request: PartRequest }) {
-  const router = useRouter();
-  const allListings = useAllListings();
-  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
-  const isOpen = request.status === 'Open';
-  // Requests on your account keep their photos private, so those are shown through short-lived links.
-  const signedUrls = useSignedRequestPhotoUrls(request.remote ? (request.photos ?? []) : []);
-  const photoSources = request.remote
-    ? signedUrls.filter((uri) => uri !== '').map((uri) => ({ uri }))
-    : (request.photos ?? []).map((name) => ({ uri: photoUri(name) }));
-  const matches = isOpen ? matchListings(request, allListings) : [];
-
-  const confirmDelete = () =>
-    showAlert('Delete request?', `“${request.partName}” will be removed.`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          const problem = await deleteRequest(request);
-          if (problem) showAlert('Couldn’t delete the request', problem);
-        },
-      },
-    ]);
-
-  return (
-    <View style={[styles.card, !isOpen && styles.cardClosed]}>
-      <View style={styles.cardTop}>
-        <Text style={styles.cardTitle} numberOfLines={2}>
-          {request.partName}
-        </Text>
-        <Stamp label={request.status.toUpperCase()} color={statusColor(request.status)} />
-      </View>
-      <Text style={styles.cardMeta}>
-        {[
-          request.vehicle || null,
-          request.source === 'Any' ? 'Local or import' : request.source,
-          categoryLabel(request.categoryId),
-          request.budget !== undefined ? `Budget $${request.budget}` : null,
-        ]
-          .filter(Boolean)
-          .join(' · ')}
-      </Text>
-      {request.notes !== '' && (
-        <Text style={styles.cardNotes} numberOfLines={2}>
-          {request.notes}
-        </Text>
-      )}
-      {photoSources.length > 0 && (
-        <View style={styles.thumbs}>
-          {photoSources.map((source, index) => (
-            <Pressable key={index} style={({ pressed }) => [styles.thumb, pressed && styles.pressed]} onPress={() => setViewerIndex(index)}>
-              <Image source={source} style={styles.thumbImage} contentFit="cover" />
-            </Pressable>
-          ))}
-        </View>
-      )}
-      <Text style={styles.cardTime}>{timeAgo(request.createdAt)}</Text>
-
-      {request.remote && request.status !== 'Closed' && (
-        <Pressable
-          style={({ pressed }) => [styles.offersRow, pressed && styles.pressed]}
-          onPress={() => router.push(`/request/${request.id}`)}>
-          <Text style={styles.offersRowText}>
-            {request.status === 'Matched'
-              ? 'Offer accepted — open chat'
-              : request.pendingOfferCount
-                ? `${request.pendingOfferCount} offer${request.pendingOfferCount === 1 ? '' : 's'} waiting`
-                : 'No offers yet'}
-          </Text>
-          <Text style={styles.matchArrow}>→</Text>
-        </Pressable>
-      )}
-
-      {isOpen && (
-        <View style={styles.matches}>
-          <Text style={styles.matchesTitle}>
-            {matches.length === 0
-              ? 'No matching listings yet'
-              : `${matches.length} possible match${matches.length === 1 ? '' : 'es'}`}
-          </Text>
-          {matches.length === 0 && (
-            <Text style={styles.matchesEmpty}>New listings that fit will appear here as they’re posted.</Text>
-          )}
-          {matches.slice(0, 3).map((listing) => (
-            <Pressable
-              key={listing.id}
-              style={({ pressed }) => [styles.matchRow, pressed && styles.pressed]}
-              onPress={() => router.push(`/listing/${listing.id}`)}>
-              <Text style={styles.matchTitle} numberOfLines={1}>
-                {listing.title}
-              </Text>
-              <Text style={styles.matchPrice}>${listing.price}</Text>
-              <Text style={styles.matchArrow}>→</Text>
-            </Pressable>
-          ))}
-          {matches.length > 3 && <Text style={styles.matchesEmpty}>+{matches.length - 3} more on Home</Text>}
-        </View>
-      )}
-
-      <View style={styles.actions}>
-        <Pressable
-          hitSlop={8}
-          onPress={async () => {
-            const problem = await toggleRequest(request);
-            if (problem) showAlert('Couldn’t update the request', problem);
-          }}>
-          <Text style={styles.actionText}>
-            {request.status === 'Open' ? 'Close request' : request.status === 'Matched' ? 'Mark done' : 'Reopen'}
-          </Text>
-        </Pressable>
-        <Pressable hitSlop={8} onPress={confirmDelete}>
-          <Text style={[styles.actionText, styles.actionDanger]}>Delete</Text>
-        </Pressable>
-      </View>
-      <PhotoViewer sources={photoSources} index={viewerIndex} onClose={() => setViewerIndex(null)} />
-    </View>
-  );
-}
-
 function BrowseCard({ request }: { request: PartRequest }) {
   const router = useRouter();
   return (
-    <Pressable
-      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
-      onPress={() => router.push(`/request/${request.id}`)}>
+    <Pressable style={({ pressed }) => [styles.card, pressed && styles.pressed]} onPress={() => router.push(`/request/${request.id}`)}>
       <View style={styles.cardTop}>
         <Text style={styles.cardTitle} numberOfLines={2}>
           {request.partName}
@@ -244,15 +109,7 @@ function BrowsePanel() {
   );
 }
 
-function SellOption({
-  title,
-  detail,
-  onPress,
-}: {
-  title: string;
-  detail: string;
-  onPress: () => void;
-}) {
+function SellOption({ title, detail, onPress }: { title: string; detail: string; onPress: () => void }) {
   return (
     <Pressable style={({ pressed }) => [styles.sellRow, pressed && styles.pressed]} onPress={onPress}>
       <View style={styles.sellText}>
@@ -320,16 +177,16 @@ function SellPanel() {
   );
 }
 
-export default function RequestScreen() {
+export default function PostScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ view?: string }>();
-  const requests = useMyRequests();
   const [mode, setMode] = useState<Mode>('new');
   const [partName, setPartName] = useState('');
   const [vehicle, setVehicle] = useState('');
   const [notes, setNotes] = useState('');
   const [photos, setPhotos] = useState<string[]>([]);
   const [budget, setBudget] = useState('');
+  const [pin, setPin] = useState<Coordinate | null>(null);
   const session = useSession();
   const [busy, setBusy] = useState(false);
   const [source, setSource] = useState<RequestSource>('Any');
@@ -343,11 +200,10 @@ export default function RequestScreen() {
   );
 
   useEffect(() => {
-    if (params.view === 'mine' || params.view === 'sell') {
+    if (params.view === 'sell' || params.view === 'browse') {
       // Route params are external state; this mirrors a one-shot navigation hint into local state.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setMode(params.view);
-      // One-shot signal: clear it so it can't override the user's later tab choice.
       router.setParams({ view: undefined });
     }
   }, [params.view, router]);
@@ -375,6 +231,8 @@ export default function RequestScreen() {
       notes: notes.trim(),
       photos,
       budget: budget.trim() !== '' && Number.isFinite(budgetValue) && budgetValue > 0 ? budgetValue : undefined,
+      latitude: pin?.latitude,
+      longitude: pin?.longitude,
     });
     setBusy(false);
     if (problem) {
@@ -382,29 +240,19 @@ export default function RequestScreen() {
       return;
     }
     success();
-    setPartName('');
-    setVehicle('');
-    setNotes('');
-    setPhotos([]);
-    setBudget('');
-    setSource('Any');
-    setCategoryId('any');
-    setMode('mine');
+    router.push('/(tabs)/activity?mode=requests');
   };
 
-  const openCount = requests.filter((r) => r.status === 'Open').length;
   const subtitle =
     mode === 'sell'
       ? 'List a part for buyers across Zimbabwe, from your shelf or from overseas.'
       : mode === 'browse'
         ? 'Name a price and offer on what someone else needs — no listing required.'
-        : mode === 'mine' && requests.length > 0
-          ? `${openCount} open`
-          : 'Post what you need and a price you’d pay. Sellers can offer that price, or counter.';
-  const title = mode === 'sell' ? 'Got a part\nto sell?' : mode === 'browse' ? 'Who needs\na hand?' : 'Can’t find\nthe part?';
+        : 'Post what you need and a price you’d pay. Sellers can offer that price, or counter.';
 
   return (
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScreenHeader title="Post" subtitle={subtitle} />
       <ScrollView
         contentContainerStyle={styles.body}
         keyboardShouldPersistTaps="handled"
@@ -419,8 +267,6 @@ export default function RequestScreen() {
             }}
           />
         }>
-        <PageHeader title={title} subtitle={subtitle} />
-
         <View style={styles.tabs}>
           <CategoryTabs categories={MODES} value={mode} onChange={(id) => setMode(id as Mode)} />
         </View>
@@ -428,7 +274,9 @@ export default function RequestScreen() {
         <View style={styles.form}>
           {mode === 'sell' ? (
             <SellPanel />
-          ) : mode === 'new' ? (
+          ) : mode === 'browse' ? (
+            <BrowsePanel />
+          ) : (
             <>
               <View style={styles.field}>
                 <Text style={styles.label}>Part name</Text>
@@ -475,6 +323,11 @@ export default function RequestScreen() {
               </View>
 
               <View style={styles.field}>
+                <Text style={styles.label}>Exact location</Text>
+                <LocationPickerMap value={pin} onChange={setPin} />
+              </View>
+
+              <View style={styles.field}>
                 <Text style={styles.label}>Photos (optional)</Text>
                 <PhotoPicker photos={photos} onChange={setPhotos} max={3} hint="The old part, or the number stamped on it" />
               </View>
@@ -493,27 +346,6 @@ export default function RequestScreen() {
 
               <Button label={busy ? 'One moment…' : 'Post request'} variant="primary" onPress={handleSubmit} />
             </>
-          ) : mode === 'browse' ? (
-            <BrowsePanel />
-          ) : requests.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>No requests yet</Text>
-              <Text style={styles.emptyText}>Post one and any matching listings will show up here.</Text>
-              <View style={styles.emptyButton}>
-                <Button label="Post a request" variant="outline" onPress={() => setMode('new')} />
-              </View>
-            </View>
-          ) : (
-            requests.map((request, index) => (
-              <View key={request.id}>
-                {index > 0 && (
-                  <View style={styles.cardGap}>
-                    <Stitch />
-                  </View>
-                )}
-                <RequestCard request={request} />
-              </View>
-            ))
           )}
         </View>
       </ScrollView>
@@ -600,16 +432,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: Spacing.xs,
   },
-  offersRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: Spacing.xs,
-    paddingVertical: Spacing.xs,
-    paddingHorizontal: Spacing.md,
-    backgroundColor: '#FBF3DE',
-    borderRadius: 10,
-  },
   offersRowText: {
     fontFamily: Fonts.bodyBold,
     fontSize: Type.small,
@@ -620,9 +442,6 @@ const styles = StyleSheet.create({
   },
   card: {
     gap: Spacing.sm,
-  },
-  cardClosed: {
-    opacity: 0.6,
   },
   cardTop: {
     flexDirection: 'row',
@@ -648,79 +467,10 @@ const styles = StyleSheet.create({
     color: Colors.ink,
     lineHeight: 19,
   },
-  thumbs: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    marginTop: Spacing.xs,
-  },
-  thumb: {
-    width: 60,
-    height: 60,
-    borderRadius: 10,
-    overflow: 'hidden',
-    backgroundColor: '#EADFC8',
-  },
-  thumbImage: {
-    width: '100%',
-    height: '100%',
-  },
   cardTime: {
     fontFamily: Fonts.bodyRegular,
     fontSize: Type.caption,
     color: Colors.muted,
-  },
-  matches: {
-    gap: Spacing.xs,
-    marginTop: Spacing.xs,
-    paddingLeft: Spacing.md,
-    borderLeftWidth: 3,
-    borderLeftColor: Colors.accent,
-  },
-  matchesTitle: {
-    fontFamily: Fonts.headingSemiBold,
-    fontSize: Type.small,
-    color: Colors.ink,
-  },
-  matchesEmpty: {
-    fontFamily: Fonts.bodyRegular,
-    fontSize: Type.small,
-    color: Colors.muted,
-  },
-  matchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    paddingVertical: Spacing.xs,
-  },
-  matchTitle: {
-    flex: 1,
-    fontFamily: Fonts.bodyMedium,
-    fontSize: Type.small,
-    color: Colors.ink,
-  },
-  matchPrice: {
-    fontFamily: Fonts.headingBold,
-    fontSize: Type.body,
-    color: Colors.ink,
-  },
-  matchArrow: {
-    fontFamily: Fonts.bodyBold,
-    fontSize: Type.small,
-    color: Colors.header,
-  },
-  actions: {
-    flexDirection: 'row',
-    gap: Spacing.xl,
-    marginTop: Spacing.xs,
-  },
-  actionText: {
-    fontFamily: Fonts.bodyBold,
-    fontSize: Type.small,
-    color: Colors.header,
-    textDecorationLine: 'underline',
-  },
-  actionDanger: {
-    color: Colors.danger,
   },
   emptyState: {
     gap: Spacing.xs,
@@ -735,9 +485,5 @@ const styles = StyleSheet.create({
     fontSize: Type.small,
     lineHeight: 19,
     color: Colors.muted,
-  },
-  emptyButton: {
-    marginTop: Spacing.lg,
-    alignSelf: 'stretch',
   },
 });

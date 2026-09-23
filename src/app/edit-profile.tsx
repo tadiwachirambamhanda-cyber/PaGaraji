@@ -13,15 +13,20 @@ import {
 import { Button } from '@/components/button';
 import { ChipSelect } from '@/components/chip-select';
 import { ScreenHeader } from '@/components/screen-header';
+import { SegmentedControl } from '@/components/segmented-control';
 import { ZIMBABWE_CITIES } from '@/components/location-sheet';
 import { success } from '@/lib/haptics';
 import { pushProfile } from '@/lib/profile-sync';
 import { updateSeller } from '@/store/my-listings';
-import { initialsOf, saveProfile, useProfile } from '@/store/profile';
+import { initialsOf, saveProfile, useProfile, type AccountRole } from '@/store/profile';
 import { showAlert } from '@/lib/alert';
 import { Colors, Fonts, Spacing, Type } from '@/theme';
 
 const CITY_OPTIONS = ZIMBABWE_CITIES.map((c) => ({ id: c, label: c }));
+
+const ROLE_CHOICES = ["I'm buying", "I'm selling"] as const;
+type RoleChoice = (typeof ROLE_CHOICES)[number];
+const roleToChoice = (role: AccountRole): RoleChoice => (role === 'seller' ? "I'm selling" : "I'm buying");
 
 export default function EditProfileScreen() {
   const router = useRouter();
@@ -29,6 +34,7 @@ export default function EditProfileScreen() {
   const [name, setName] = useState(profile.name);
   const [phone, setPhone] = useState(profile.phone);
   const [city, setCity] = useState(profile.city);
+  const [roleChoice, setRoleChoice] = useState<RoleChoice>(roleToChoice(profile.role));
 
   const handleSave = async () => {
     const digits = phone.replace(/[\s+()-]/g, '');
@@ -40,7 +46,8 @@ export default function EditProfileScreen() {
       showAlert('Check your number', 'Use digits only, with the country code — e.g. 263771234567.');
       return;
     }
-    const next = { name: name.trim(), phone: digits, city };
+    const role: AccountRole = roleChoice === "I'm selling" ? 'seller' : 'buyer';
+    const next = { name: name.trim(), phone: digits, city, role };
     saveProfile(next);
     updateSeller({ name: next.name, initials: initialsOf(next.name), phone: next.phone });
     // Signed in: also save it on your account, so it follows you and updates your online listings.
@@ -76,6 +83,12 @@ export default function EditProfileScreen() {
         <View style={styles.field}>
           <Text style={styles.label}>City</Text>
           <ChipSelect options={CITY_OPTIONS} value={city} onChange={setCity} />
+        </View>
+
+        <View style={styles.field}>
+          <Text style={styles.label}>Mostly here to...</Text>
+          <SegmentedControl options={ROLE_CHOICES} value={roleChoice} onChange={setRoleChoice} />
+          <Text style={styles.hint}>Just sets what you see first — you can still do both either way.</Text>
         </View>
 
         <Button label="Save changes" variant="primary" onPress={handleSave} />

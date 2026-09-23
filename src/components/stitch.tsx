@@ -6,15 +6,17 @@ type StitchProps = {
   color?: string;
   thickness?: number;
   vertical?: boolean;
+  /** The old Market Stall look. Workshop's default is a plain solid line. */
+  dashed?: boolean;
 };
 
 /**
- * Dashed "stitched" divider. React Native only renders dashed borders reliably
- * when all four sides are drawn, so draw an oversized dashed box and clip it to
- * a single edge.
+ * A plain divider line — solid by default (Workshop). React Native only renders
+ * dashed borders reliably when all four sides are drawn, so for `dashed` this
+ * draws an oversized dashed box and clips it to a single edge.
  */
-export function Stitch({ color = Colors.header, thickness = 1.5, vertical = false }: StitchProps) {
-  const box = { borderColor: color, borderWidth: thickness };
+export function Stitch({ color = Colors.line, thickness = 1.5, vertical = false, dashed = false }: StitchProps) {
+  const box = { borderColor: color, borderWidth: thickness, borderStyle: dashed ? ('dashed' as const) : ('solid' as const) };
   return (
     <View
       style={vertical ? { width: thickness, overflow: 'hidden' } : { height: thickness, overflow: 'hidden' }}
@@ -27,7 +29,6 @@ export function Stitch({ color = Colors.header, thickness = 1.5, vertical = fals
 
 const styles = StyleSheet.create({
   line: {
-    borderStyle: 'dashed',
     borderRadius: 1,
   },
 });

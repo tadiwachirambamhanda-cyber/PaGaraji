@@ -17,7 +17,7 @@ export function stampLabel(listing: Pick<Listing, 'origin' | 'location'>): strin
   return `${listing.origin.toUpperCase()} IMPORT`;
 }
 
-/** Rubber-stamp style origin mark: dashed outline, slight tilt. */
+/** Toolbox-label style origin mark: solid border, square — no tilt, no dashes. */
 export function Stamp({ label, imported = false, color: override }: { label: string; imported?: boolean; color?: string }) {
   const color = override ?? (imported ? Colors.importInk : Colors.header);
   return (
@@ -31,13 +31,11 @@ export function Stamp({ label, imported = false, color: override }: { label: str
 
 const styles = StyleSheet.create({
   stamp: {
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.card,
     borderWidth: 1.5,
-    borderStyle: 'dashed',
     borderRadius: 4,
     paddingHorizontal: 7,
     paddingVertical: 2,
-    transform: [{ rotate: '3deg' }],
   },
   text: {
     fontFamily: Fonts.bodyBold,

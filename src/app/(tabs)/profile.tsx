@@ -76,7 +76,7 @@ export default function ProfileScreen() {
         <Stitch vertical />
         <Stat value={savedCount} label="saved" onPress={() => router.push('/saved-parts')} />
         <Stitch vertical />
-        <Stat value={openRequests} label="wanted" onPress={() => router.push('/request?view=mine')} />
+        <Stat value={openRequests} label="wanted" onPress={() => router.push('/(tabs)/activity?mode=requests')} />
       </View>
       <Stitch />
 

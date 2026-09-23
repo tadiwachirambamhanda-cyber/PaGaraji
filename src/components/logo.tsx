@@ -29,9 +29,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   pa: {
-    fontFamily: Fonts.headingBold,
+    fontFamily: Fonts.display,
+    letterSpacing: -0.5,
   },
   garaji: {
-    fontFamily: Fonts.headingBold,
+    fontFamily: Fonts.display,
+    letterSpacing: -0.5,
   },
 });

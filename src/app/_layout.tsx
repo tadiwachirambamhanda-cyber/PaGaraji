@@ -1,8 +1,14 @@
 // Keeps listings, requests and supplier status fresh whenever the app returns to the foreground.
 import '@/lib/refresh';
 
-import { Baloo2_500Medium, Baloo2_600SemiBold, Baloo2_700Bold } from '@expo-google-fonts/baloo-2';
-import { Manrope_400Regular, Manrope_500Medium, Manrope_700Bold } from '@expo-google-fonts/manrope';
+import { ArchivoBlack_400Regular } from '@expo-google-fonts/archivo-black';
+import {
+  Barlow_400Regular,
+  Barlow_500Medium,
+  Barlow_600SemiBold,
+  Barlow_700Bold,
+  Barlow_800ExtraBold,
+} from '@expo-google-fonts/barlow';
 import { useFonts } from 'expo-font';
 import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -16,12 +22,12 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   const hydrated = useSettingsHydrated();
   const [fontsLoaded] = useFonts({
-    Baloo2_500Medium,
-    Baloo2_600SemiBold,
-    Baloo2_700Bold,
-    Manrope_400Regular,
-    Manrope_500Medium,
-    Manrope_700Bold,
+    ArchivoBlack_400Regular,
+    Barlow_400Regular,
+    Barlow_500Medium,
+    Barlow_600SemiBold,
+    Barlow_700Bold,
+    Barlow_800ExtraBold,
   });
 
   useEffect(() => {
@@ -47,13 +53,13 @@ export default function RootLayout() {
             <Stack.Screen name="chat/[id]" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="my-listings" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="saved-parts" options={{ animation: 'slide_from_right' }} />
-            <Stack.Screen name="notifications" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="edit-profile" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="settings" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="become-supplier" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="my-vehicle" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="sign-in" options={{ animation: 'slide_from_bottom' }} />
             <Stack.Screen name="list-part" options={{ animation: 'slide_from_bottom' }} />
+            <Stack.Screen name="post" options={{ animation: 'slide_from_bottom' }} />
           </Stack>
         </View>
       </View>
@@ -65,7 +71,7 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: Platform.OS === 'web' ? '#E4DBC5' : undefined,
+    backgroundColor: Platform.OS === 'web' ? '#171310' : undefined,
   },
   frame: {
     flex: 1,

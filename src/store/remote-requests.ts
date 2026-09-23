@@ -17,6 +17,8 @@ export type RequestRow = {
   status: RequestStatus;
   matched_offer_id: string | null;
   created_at: string;
+  latitude: number | string | null;
+  longitude: number | string | null;
 };
 
 export function fromRow(row: RequestRow): PartRequest {
@@ -34,6 +36,8 @@ export function fromRow(row: RequestRow): PartRequest {
     createdAt: Date.parse(row.created_at),
     status: row.status,
     matchedOfferId: row.matched_offer_id ?? undefined,
+    latitude: row.latitude === null ? undefined : Number(row.latitude),
+    longitude: row.longitude === null ? undefined : Number(row.longitude),
   };
 }
 

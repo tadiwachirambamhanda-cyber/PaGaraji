@@ -4,7 +4,8 @@ import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'rea
 
 import { CategoryTabs } from '@/components/category-tabs';
 import { applyFilters, EMPTY_FILTERS, FilterSheet, isFiltersActive, type Filters } from '@/components/filter-sheet';
-import { BellIcon, ChevronDownIcon, LocationIcon } from '@/components/icons';
+import { BellIcon, ChevronDownIcon, LocationIcon, PlusIcon } from '@/components/icons';
+import { HomeMap } from '@/components/home-map';
 import { InlineToggle } from '@/components/inline-toggle';
 import { ListingCard } from '@/components/listing-card';
 import { LocationSheet } from '@/components/location-sheet';
@@ -18,11 +19,12 @@ import { categories } from '@/data/categories';
 import { tapLight } from '@/lib/haptics';
 import { refreshAll } from '@/lib/refresh';
 import { useAllListings } from '@/store/my-listings';
+import { useOpenRequests } from '@/store/open-requests';
 import { saveProfile, useProfile } from '@/store/profile';
 import { addRecentSearch, clearRecentSearches, useRecentSearches } from '@/store/recent-searches';
 import { useSettings, useSettingsHydrated } from '@/store/settings';
 import { useVehicle } from '@/store/vehicle';
-import { Colors, Fonts, Spacing, Type } from '@/theme';
+import { Colors, Fonts, Radii, Spacing, Type } from '@/theme';
 
 const SOURCES = ['All', 'Local', 'Import'] as const;
 type Source = (typeof SOURCES)[number];
@@ -47,6 +49,7 @@ export default function HomeScreen() {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [draftFilters, setDraftFilters] = useState<Filters>(EMPTY_FILTERS);
   const listings = useAllListings();
+  const openRequests = useOpenRequests();
 
   useEffect(() => {
     if (params.category) {
@@ -123,7 +126,10 @@ export default function HomeScreen() {
                       <Text style={styles.locationText}>{profile.city}</Text>
                       <ChevronDownIcon size={13} color={Colors.header} />
                     </Pressable>
-                    <Pressable accessibilityLabel="Notifications" hitSlop={10} onPress={() => router.push('/notifications')}>
+                    <Pressable
+                      accessibilityLabel="Notifications"
+                      hitSlop={10}
+                      onPress={() => router.push('/(tabs)/activity?mode=matches')}>
                       <BellIcon size={22} color={Colors.ink} />
                     </Pressable>
                   </View>
@@ -166,6 +172,10 @@ export default function HomeScreen() {
               </View>
             )}
 
+            <View style={styles.mapSection}>
+              <HomeMap listings={sorted} requests={openRequests} height={240} />
+            </View>
+
             <View style={styles.tabs}>
               <CategoryTabs categories={categories} value={selectedCategory} onChange={setSelectedCategory} />
             </View>
@@ -184,7 +194,7 @@ export default function HomeScreen() {
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>Nothing here yet</Text>
             <Text style={styles.emptyText}>Try another category or fewer filters. Or tell sellers what you need.</Text>
-            <Pressable hitSlop={8} onPress={() => router.push('/request')}>
+            <Pressable hitSlop={8} onPress={() => router.push('/post')}>
               <Text style={styles.link}>Request a part</Text>
             </Pressable>
           </View>
@@ -194,7 +204,7 @@ export default function HomeScreen() {
             <Stitch />
             <Pressable
               style={({ pressed }) => [styles.sellRow, pressed && styles.pressed]}
-              onPress={() => router.push('/request?view=sell')}>
+              onPress={() => router.push('/post?view=sell')}>
               <View style={styles.sellText}>
                 <Text style={styles.sellTitle}>Got parts to sell?</Text>
                 <Text style={styles.sellDetail}>List them here, from your shelf or from overseas.</Text>
@@ -205,6 +215,16 @@ export default function HomeScreen() {
         }
         renderItem={({ item }) => <ListingCard listing={item} half />}
       />
+
+      <Pressable
+        style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
+        accessibilityLabel="Post a request or a listing"
+        onPress={() => {
+          tapLight();
+          router.push('/post');
+        }}>
+        <PlusIcon size={24} color="#FFFFFF" />
+      </Pressable>
 
       <SortSheet
         visible={sortVisible}
@@ -285,9 +305,12 @@ const styles = StyleSheet.create({
     fontSize: Type.small,
     color: Colors.muted,
   },
+  mapSection: {
+    marginTop: Spacing.lg,
+  },
   tabs: {
     paddingLeft: Spacing.xl,
-    marginTop: Spacing.sm,
+    marginTop: Spacing.lg,
   },
   controls: {
     flexDirection: 'row',
@@ -355,5 +378,24 @@ const styles = StyleSheet.create({
     fontSize: Type.small,
     lineHeight: 19,
     color: Colors.muted,
+  },
+  fab: {
+    position: 'absolute',
+    right: Spacing.xl,
+    bottom: Spacing.xl,
+    width: 56,
+    height: 56,
+    borderRadius: Radii.md,
+    backgroundColor: Colors.header,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  fabPressed: {
+    opacity: 0.85,
   },
 });

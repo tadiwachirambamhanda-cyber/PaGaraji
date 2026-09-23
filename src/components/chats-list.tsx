@@ -1,10 +1,8 @@
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
-import { PageHeader } from '@/components/page-header';
 import { Stitch } from '@/components/stitch';
-import { refreshAll } from '@/lib/refresh';
 import { timeAgo } from '@/lib/time';
 import { initialsOf } from '@/store/profile';
 import {
@@ -47,66 +45,51 @@ function ConversationRow({ item }: { item: ConversationSummary }) {
   );
 }
 
-export default function ChatsScreen() {
+/** The Chats list, bare — no header, embeddable inside the Activity tab. */
+export function ChatsList() {
   const conversations = useConversations();
   const hydrated = useConversationsHydrated();
-  const unread = conversations.filter((c) => c.unreadCount > 0).length;
   const [refreshing, setRefreshing] = useState(false);
 
-  useFocusEffect(
-    useCallback(() => {
-      refreshAll();
-    }, []),
-  );
-
   return (
-    <View style={styles.screen}>
-      <FlatList
-        data={conversations}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            tintColor={Colors.header}
-            onRefresh={async () => {
-              setRefreshing(true);
-              await refreshConversations();
-              setRefreshing(false);
-            }}
-          />
-        }
-        ListHeaderComponent={
-          <PageHeader title="Chats" subtitle={unread > 0 ? `${unread} waiting for a reply` : undefined} />
-        }
-        ItemSeparatorComponent={() => (
-          <View style={styles.separator}>
-            <Stitch color={Colors.muted} thickness={1} />
+    <FlatList
+      data={conversations}
+      keyExtractor={(item) => item.id}
+      contentContainerStyle={styles.list}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          tintColor={Colors.header}
+          onRefresh={async () => {
+            setRefreshing(true);
+            await refreshConversations();
+            setRefreshing(false);
+          }}
+        />
+      }
+      ItemSeparatorComponent={() => (
+        <View style={styles.separator}>
+          <Stitch color={Colors.muted} thickness={1} />
+        </View>
+      )}
+      ListEmptyComponent={
+        hydrated ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>No conversations yet</Text>
+            <Text style={styles.emptyText}>Open a listing and tap Message to start one with the seller.</Text>
           </View>
-        )}
-        ListEmptyComponent={
-          hydrated ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>No conversations yet</Text>
-              <Text style={styles.emptyText}>Open a listing and tap Message to start one with the seller.</Text>
-            </View>
-          ) : (
-            <View style={styles.loading}>
-              <ActivityIndicator color={Colors.muted} />
-            </View>
-          )
-        }
-        renderItem={({ item }) => <ConversationRow item={item} />}
-      />
-    </View>
+        ) : (
+          <View style={styles.loading}>
+            <ActivityIndicator color={Colors.muted} />
+          </View>
+        )
+      }
+      renderItem={({ item }) => <ConversationRow item={item} />}
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
   list: {
     flexGrow: 1,
     paddingBottom: Spacing.xxxl,
