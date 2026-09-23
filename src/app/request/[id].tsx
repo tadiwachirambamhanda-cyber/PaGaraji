@@ -18,9 +18,10 @@ import {
   completeMatch,
   counterOffer,
   fetchMyOffer,
-  fetchOffersForRequest,
   respondToCounterOffer,
   submitOffer,
+  useMyOfferForRequest,
+  useOffersForRequest,
   withdrawOffer,
   type RequestOffer,
 } from '@/lib/offers';
@@ -32,7 +33,7 @@ import { useSession } from '@/store/auth';
 import { useConversationForRequest } from '@/store/conversations';
 import { useMyRequests, type PartRequest } from '@/store/my-requests';
 import { useOpenRequests } from '@/store/open-requests';
-import { fetchRequestById } from '@/store/remote-requests';
+import { fetchRequestById, useLiveRequestStatus } from '@/store/remote-requests';
 import { initialsOf } from '@/store/profile';
 import { Fonts, Radii, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
@@ -157,7 +158,9 @@ export default function RequestDetailScreen() {
   const openRequests = useOpenRequests();
   const localRequest = myRequests.find((r) => r.id === id) ?? openRequests.find((r) => r.id === id);
   const [remoteRequest, setRemoteRequest] = useState<PartRequest | null>(null);
-  const request = localRequest ?? remoteRequest ?? undefined;
+  const liveStatus = useLiveRequestStatus(id);
+  const baseRequest = localRequest ?? remoteRequest ?? undefined;
+  const request = baseRequest && liveStatus ? { ...baseRequest, status: liveStatus.status, matchedOfferId: liveStatus.matchedOfferId } : baseRequest;
   const isOwn = myRequests.some((r) => r.id === id);
   const myConversation = useConversationForRequest(id);
 
@@ -170,16 +173,14 @@ export default function RequestDetailScreen() {
   }, [id, localRequest, remoteRequest]);
 
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
-  const [offers, setOffers] = useState<RequestOffer[]>([]);
-  const [offersLoading, setOffersLoading] = useState(true);
+  const { offers, loading: offersLoading, refetch: refetchOffers } = useOffersForRequest(id, isOwn);
+  const { myOffer, setMyOffer } = useMyOfferForRequest(id, !isOwn);
   const [accepting, setAccepting] = useState<string | null>(null);
   const [countering, setCountering] = useState<string | null>(null);
   const [respondingToCounter, setRespondingToCounter] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [rateSheetOpen, setRateSheetOpen] = useState(false);
-  // undefined: not checked yet. null: checked, no offer of yours exists.
-  const [myOffer, setMyOffer] = useState<RequestOffer | null | undefined>(undefined);
   const [price, setPrice] = useState('');
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -189,23 +190,6 @@ export default function RequestDetailScreen() {
 
   const signedUrls = useSignedRequestPhotoUrls(request?.photos ?? []);
   const photoSources = signedUrls.filter((uri) => uri !== '').map((uri) => ({ uri }));
-
-  useEffect(() => {
-    if (!id || !isOwn) return;
-    // Mirrors the (missing) route param / fetch state, not a response to user input —
-    // same pattern as lib/messages.ts's useThreadMessages.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setOffersLoading(true);
-    fetchOffersForRequest(id).then((rows) => {
-      setOffers(rows);
-      setOffersLoading(false);
-    });
-  }, [id, isOwn]);
-
-  useEffect(() => {
-    if (!id || isOwn) return;
-    fetchMyOffer(id).then(setMyOffer);
-  }, [id, isOwn]);
 
   useEffect(() => {
     if (isOwn || !request?.userId) return;
@@ -284,7 +268,7 @@ export default function RequestDetailScreen() {
       return;
     }
     success();
-    setOffers(await fetchOffersForRequest(request.id));
+    refetchOffers();
   };
 
   const respondToCounter = async (accept: boolean) => {
@@ -314,7 +298,7 @@ export default function RequestDetailScreen() {
       return;
     }
     success();
-    if (isOwn) setOffers(await fetchOffersForRequest(request.id));
+    if (isOwn) refetchOffers();
     else setMyOffer(await fetchMyOffer(request.id));
     // The fallback fetch below (see the effect near the top) isn't tied into the
     // myRequests/openRequests refresh cancelMatch() already triggered, so a seller

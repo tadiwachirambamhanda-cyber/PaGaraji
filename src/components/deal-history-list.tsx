@@ -1,10 +1,11 @@
 import { useRouter } from 'expo-router';
-import { useEffect, useState, useMemo } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useState, useMemo } from 'react';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
-import { ScreenHeader } from '@/components/screen-header';
-import { fetchMyDeals, type Deal } from '@/lib/offers';
+import { type Deal } from '@/lib/offers';
+import { refreshAll } from '@/lib/refresh';
 import { timeAgo } from '@/lib/time';
+import { useMyDeals, useMyDealsHydrated } from '@/store/deal-history';
 import { Fonts, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
 function DealRow({ deal, onPress, onRebook }: { deal: Deal; onPress: () => void; onRebook: () => void }) {
@@ -35,51 +36,54 @@ function DealRow({ deal, onPress, onRebook }: { deal: Deal; onPress: () => void;
   );
 }
 
-export default function DealHistoryScreen() {
+/** Every deal you've closed, either side — the Activity tab's Deals mode. */
+export function DealHistoryList() {
   const Colors = useColors();
   const styles = useMemo(() => createStyles(Colors), [Colors]);
   const router = useRouter();
-  const [deals, setDeals] = useState<Deal[] | null>(null);
-
-  useEffect(() => {
-    fetchMyDeals().then(setDeals);
-  }, []);
+  const deals = useMyDeals();
+  const hydrated = useMyDealsHydrated();
+  const [refreshing, setRefreshing] = useState(false);
 
   return (
-    <View style={styles.screen}>
-      <ScreenHeader title="Past deals" />
-      <FlatList
-        data={deals ?? []}
-        keyExtractor={(item) => item.offerId}
-        contentContainerStyle={styles.content}
-        ListEmptyComponent={
-          deals === null ? (
-            <ActivityIndicator color={Colors.muted} style={styles.loading} />
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>No deals yet</Text>
-              <Text style={styles.emptyText}>Once you buy or sell through a request, it’ll show up here.</Text>
-            </View>
-          )
-        }
-        renderItem={({ item }) => (
-          <DealRow
-            deal={item}
-            onPress={() => router.push(`/request/${item.requestId}`)}
-            onRebook={() => router.push(`/post?partName=${encodeURIComponent(item.partName)}`)}
-          />
-        )}
-      />
-    </View>
+    <FlatList
+      data={deals}
+      keyExtractor={(item) => item.offerId}
+      contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          tintColor={Colors.header}
+          onRefresh={async () => {
+            setRefreshing(true);
+            await refreshAll();
+            setRefreshing(false);
+          }}
+        />
+      }
+      ListEmptyComponent={
+        !hydrated ? (
+          <ActivityIndicator color={Colors.muted} style={styles.loading} />
+        ) : (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>No deals yet</Text>
+            <Text style={styles.emptyText}>Once you buy or sell through a request, it’ll show up here.</Text>
+          </View>
+        )
+      }
+      renderItem={({ item }) => (
+        <DealRow
+          deal={item}
+          onPress={() => router.push(`/request/${item.requestId}`)}
+          onRebook={() => router.push(`/post?partName=${encodeURIComponent(item.partName)}`)}
+        />
+      )}
+    />
   );
 }
 
 function createStyles(Colors: ColorPalette) {
   return StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
   content: {
     padding: Spacing.xl,
     flexGrow: 1,

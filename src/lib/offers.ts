@@ -1,7 +1,10 @@
+import { useCallback, useEffect, useState } from 'react';
+
+import { supabase } from '@/lib/supabase';
+import { useAuthReady } from '@/store/auth';
 import { refreshConversations } from '@/store/conversations';
 import { refreshOpenRequests } from '@/store/open-requests';
 import { refreshRemoteRequests } from '@/store/remote-requests';
-import { supabase } from '@/lib/supabase';
 
 export type OfferStatus = 'pending' | 'countered' | 'accepted' | 'declined' | 'withdrawn' | 'cancelled';
 
@@ -132,6 +135,114 @@ export async function fetchMyOffer(requestId: string): Promise<RequestOffer | nu
     .eq('seller_id', myId)
     .maybeSingle();
   return data ? fromRow(data as OfferRow) : null;
+}
+
+/**
+ * Live view of every offer on a request — like `fetchOffersForRequest`, but updates itself as
+ * offers arrive or change (InDrive-style: watch bids land without leaving the screen), instead
+ * of only ever loading once on mount. Any insert/update on this request's offers just re-runs
+ * the full enriched fetch rather than patching individual rows client-side — the enrichment
+ * (ratings, stats, verified) doesn't come from `request_offers` itself, so a raw Realtime
+ * payload couldn't carry it anyway, and refetching keeps this in lockstep with what a plain
+ * `fetchOffersForRequest` call would return. `enabled` mirrors the caller's own gate (e.g. only
+ * the request's owner should be subscribed at all) rather than baking that assumption in here.
+ */
+export function useOffersForRequest(
+  requestId: string | undefined,
+  enabled: boolean,
+): { offers: RequestOffer[]; loading: boolean; refetch: () => Promise<void> } {
+  const [offers, setOffers] = useState<RequestOffer[]>([]);
+  const [loading, setLoading] = useState(true);
+  // A channel subscribed before the saved session finishes restoring connects as nobody, and
+  // Realtime then correctly (per RLS) delivers it nothing — same fix as useThreadMessages.
+  const authReady = useAuthReady();
+
+  const refetch = useCallback(async () => {
+    if (!requestId) return;
+    setOffers(await fetchOffersForRequest(requestId));
+  }, [requestId]);
+
+  useEffect(() => {
+    const client = supabase;
+    if (!requestId || !enabled || !client || !authReady) {
+      // Mirrors the (missing) route param / gate state, not a response to user input.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setOffers([]);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    fetchOffersForRequest(requestId).then((rows) => {
+      if (!cancelled) {
+        setOffers(rows);
+        setLoading(false);
+      }
+    });
+
+    const channel = client
+      .channel(`request-offers-${requestId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'request_offers', filter: `request_id=eq.${requestId}` },
+        () => {
+          fetchOffersForRequest(requestId).then((rows) => {
+            if (!cancelled) setOffers(rows);
+          });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      client.removeChannel(channel);
+    };
+  }, [requestId, enabled, authReady]);
+
+  return { offers, loading, refetch };
+}
+
+/**
+ * Live view of your own offer on a request — the seller-side mirror of `useOffersForRequest`,
+ * so e.g. a buyer accepting your offer shows up here without you needing to leave and reopen
+ * the screen.
+ */
+export function useMyOfferForRequest(
+  requestId: string | undefined,
+  enabled: boolean,
+): { myOffer: RequestOffer | null | undefined; setMyOffer: (offer: RequestOffer | null) => void } {
+  // undefined: not checked yet. null: checked, no offer of yours exists.
+  const [myOffer, setMyOffer] = useState<RequestOffer | null | undefined>(undefined);
+  const authReady = useAuthReady();
+
+  useEffect(() => {
+    const client = supabase;
+    if (!requestId || !enabled || !client || !authReady) return;
+    let cancelled = false;
+    fetchMyOffer(requestId).then((offer) => {
+      if (!cancelled) setMyOffer(offer);
+    });
+
+    const channel = client
+      .channel(`my-offer-${requestId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'request_offers', filter: `request_id=eq.${requestId}` },
+        () => {
+          fetchMyOffer(requestId).then((offer) => {
+            if (!cancelled) setMyOffer(offer);
+          });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      client.removeChannel(channel);
+    };
+  }, [requestId, enabled, authReady]);
+
+  return { myOffer, setMyOffer };
 }
 
 /** Makes an offer on someone else's Open request. Returns an error message, or null on success. */

@@ -1,6 +1,7 @@
-import { useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 
 import { supabase } from '@/lib/supabase';
+import { useAuthReady } from '@/store/auth';
 import type { PartRequest, RequestSource, RequestStatus } from '@/store/my-requests';
 
 /** A row of the `requests` table, as the API returns it. */
@@ -116,6 +117,54 @@ export async function fetchRequestById(id: string): Promise<PartRequest | null> 
   const { data, error } = await supabase.from('requests').select('*').eq('id', id).maybeSingle();
   if (error || !data) return null;
   return fromRow(data as RequestRow);
+}
+
+/**
+ * Live overrides for one request's status/matched_offer_id — the request detail screen's own
+ * Stamp (Open/Matched/Closed) otherwise only catches up on a later navigation or refreshAll(),
+ * the same staleness `useOffersForRequest` fixed for the offers list itself. Only tracks these
+ * two fields rather than the whole row, since nothing else on a request changes after posting.
+ * Returns null until the first live event arrives — the caller already has an initial value
+ * from wherever it got the request (myRequests/openRequests/fetchRequestById), this only ever
+ * overrides it once something actually changes.
+ */
+export function useLiveRequestStatus(requestId: string | undefined): { status: RequestStatus; matchedOfferId?: string } | null {
+  const [live, setLive] = useState<{ status: RequestStatus; matchedOfferId?: string } | null>(null);
+  const authReady = useAuthReady();
+
+  useEffect(() => {
+    const client = supabase;
+    if (!requestId || !client || !authReady) {
+      // Mirrors the (missing) route param / auth state, not a response to user input.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLive(null);
+      return;
+    }
+    let cancelled = false;
+    // A stale override from a previously-viewed request shouldn't leak onto this one
+    // before the first event for it arrives.
+    setLive(null);
+
+    const channel = client
+      .channel(`request-status-${requestId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'requests', filter: `id=eq.${requestId}` },
+        (payload) => {
+          if (cancelled) return;
+          const row = payload.new as RequestRow;
+          setLive({ status: row.status, matchedOfferId: row.matched_offer_id ?? undefined });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      client.removeChannel(channel);
+    };
+  }, [requestId, authReady]);
+
+  return live;
 }
 
 function subscribe(listener: () => void) {

@@ -93,7 +93,7 @@ export function AppSidebar() {
         <Stitch />
 
         <View>
-          <MenuRow label="Past deals" onPress={() => go('/deal-history')} />
+          <MenuRow label="Past deals" onPress={() => go('/(tabs)/activity?mode=deals')} />
           <Stitch color={Colors.muted} thickness={1} />
           <MenuRow
             label="My vehicle"

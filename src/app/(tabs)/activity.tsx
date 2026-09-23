@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { CategoryTabs } from '@/components/category-tabs';
 import { ChatsList } from '@/components/chats-list';
+import { DealHistoryList } from '@/components/deal-history-list';
 import { MyRequestsList } from '@/components/my-requests-list';
 import { NotificationsList } from '@/components/notifications-list';
 import { PageHeader } from '@/components/page-header';
@@ -11,6 +12,7 @@ import { tapLight } from '@/lib/haptics';
 import { refreshAll } from '@/lib/refresh';
 import { useNotifications } from '@/lib/notifications';
 import { useUnreadCount } from '@/store/conversations';
+import { markDealsSeen, useNewDealsCount } from '@/store/deal-history';
 import { useMyRequests } from '@/store/my-requests';
 import { initialsOf, useProfile } from '@/store/profile';
 import { openSidebar } from '@/store/sidebar';
@@ -20,6 +22,7 @@ const MODES = [
   { id: 'chats', label: 'Chats' },
   { id: 'requests', label: 'Requests' },
   { id: 'matches', label: 'Matches' },
+  { id: 'deals', label: 'Deals' },
 ] as const;
 type Mode = (typeof MODES)[number]['id'];
 
@@ -32,6 +35,7 @@ export default function ActivityScreen() {
   const unread = useUnreadCount();
   const openRequests = useMyRequests().filter((r) => r.status === 'Open').length;
   const matchCount = useNotifications().length;
+  const newDeals = useNewDealsCount();
   const profile = useProfile();
 
   useFocusEffect(
@@ -41,7 +45,7 @@ export default function ActivityScreen() {
   );
 
   useEffect(() => {
-    if (params.mode === 'chats' || params.mode === 'requests' || params.mode === 'matches') {
+    if (params.mode === 'chats' || params.mode === 'requests' || params.mode === 'matches' || params.mode === 'deals') {
       // Route params are external state; this mirrors a one-shot navigation hint into local state.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setMode(params.mode);
@@ -49,7 +53,13 @@ export default function ActivityScreen() {
     }
   }, [params.mode, router]);
 
-  const counts: Record<Mode, number> = { chats: unread, requests: openRequests, matches: matchCount };
+  // Same idea as markConversationRead firing on entering a chat thread — opening the tab is
+  // what clears its own badge.
+  useEffect(() => {
+    if (mode === 'deals') markDealsSeen();
+  }, [mode]);
+
+  const counts: Record<Mode, number> = { chats: unread, requests: openRequests, matches: matchCount, deals: newDeals };
   const subtitle =
     mode === 'chats'
       ? unread > 0
@@ -57,9 +67,13 @@ export default function ActivityScreen() {
         : undefined
       : mode === 'requests'
         ? `${openRequests} open`
-        : matchCount > 0
-          ? `${matchCount} new`
-          : undefined;
+        : mode === 'matches'
+          ? matchCount > 0
+            ? `${matchCount} new`
+            : undefined
+          : newDeals > 0
+            ? `${newDeals} new`
+            : undefined;
 
   return (
     <View style={styles.screen}>
@@ -87,6 +101,7 @@ export default function ActivityScreen() {
         {mode === 'chats' && <ChatsList />}
         {mode === 'requests' && <MyRequestsList onPostNew={() => router.push('/post')} />}
         {mode === 'matches' && <NotificationsList onSelect={() => setMode('requests')} />}
+        {mode === 'deals' && <DealHistoryList />}
       </View>
     </View>
   );

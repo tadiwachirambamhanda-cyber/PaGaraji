@@ -2,6 +2,7 @@ import { AppState, type AppStateStatus } from 'react-native';
 
 import { pingPresence } from '@/lib/presence';
 import { refreshConversations } from '@/store/conversations';
+import { refreshMyDeals } from '@/store/deal-history';
 import { refreshOpenRequests } from '@/store/open-requests';
 import { refreshRemoteListings } from '@/store/remote-listings';
 import { refreshRemoteRequests } from '@/store/remote-requests';
@@ -9,11 +10,12 @@ import { refreshSupplier } from '@/store/supplier';
 
 /**
  * Re-fetches everything that can go stale while a screen sits open: listings, your requests,
- * other people's open requests (to bid on), your supplier application status, and your
- * conversations. Each store's own refresh function is a no-op without a backend or a signed-in
- * session, so this is always safe to call. Chat also updates live over Realtime — this is the
- * fallback for whenever that isn't connected. Also pings your own presence (throttled) — piggy-
- * backing on the same "screen is open and active" signal rather than a separate timer.
+ * other people's open requests (to bid on), your supplier application status, your closed
+ * deals, and your conversations. Each store's own refresh function is a no-op without a backend
+ * or a signed-in session, so this is always safe to call. Chat also updates live over Realtime —
+ * this is the fallback for whenever that isn't connected. Also pings your own presence
+ * (throttled) — piggybacking on the same "screen is open and active" signal rather than a
+ * separate timer.
  */
 export async function refreshAll(): Promise<void> {
   await Promise.all([
@@ -22,6 +24,7 @@ export async function refreshAll(): Promise<void> {
     refreshOpenRequests(),
     refreshSupplier(),
     refreshConversations(),
+    refreshMyDeals(),
     pingPresence(),
   ]);
 }
