@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -28,13 +28,15 @@ import { addListing, useMyListings } from '@/store/my-listings';
 import { getProfile, initialsOf } from '@/store/profile';
 import { getSupplier, isApprovedSupplier, useSupplier } from '@/store/supplier';
 import { showAlert } from '@/lib/alert';
-import { Colors, Fonts, Spacing, Type } from '@/theme';
+import { Fonts, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
 const CONDITIONS: Condition[] = ['New', 'Used', 'Refurb'];
 
 const SELLABLE_CATEGORIES = categories.filter((c) => c.id !== 'all');
 
 export default function ListPartScreen() {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   const router = useRouter();
   const params = useLocalSearchParams<{ origin?: string; edit?: string }>();
   const myListings = useMyListings();
@@ -294,7 +296,8 @@ export default function ListPartScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(Colors: ColorPalette) {
+  return StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -329,7 +332,7 @@ const styles = StyleSheet.create({
   supplierLink: {
     fontFamily: Fonts.bodyBold,
     fontSize: Type.small,
-    color: Colors.header,
+    color: Colors.ink,
     textDecorationLine: 'underline',
     textAlign: 'center',
   },
@@ -338,3 +341,4 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
 });
+}

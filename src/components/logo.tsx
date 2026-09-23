@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { WrenchIcon } from '@/components/icons';
-import { Colors, Fonts } from '@/theme';
+import { Fonts, useColors } from '@/theme';
 
 type LogoProps = {
   size?: number;
@@ -9,6 +9,7 @@ type LogoProps = {
 };
 
 export function Logo({ size = 32, onDark = false }: LogoProps) {
+  const Colors = useColors();
   const fontSize = size;
   const wrenchSize = size * 0.32;
 

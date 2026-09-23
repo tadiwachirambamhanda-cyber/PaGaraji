@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -20,7 +20,7 @@ import { pushProfile } from '@/lib/profile-sync';
 import { updateSeller } from '@/store/my-listings';
 import { initialsOf, saveProfile, useProfile, type AccountRole } from '@/store/profile';
 import { showAlert } from '@/lib/alert';
-import { Colors, Fonts, Spacing, Type } from '@/theme';
+import { Fonts, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
 const CITY_OPTIONS = ZIMBABWE_CITIES.map((c) => ({ id: c, label: c }));
 
@@ -29,6 +29,8 @@ type RoleChoice = (typeof ROLE_CHOICES)[number];
 const roleToChoice = (role: AccountRole): RoleChoice => (role === 'seller' ? "I'm selling" : "I'm buying");
 
 export default function EditProfileScreen() {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   const router = useRouter();
   const profile = useProfile();
   const [name, setName] = useState(profile.name);
@@ -97,7 +99,8 @@ export default function EditProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(Colors: ColorPalette) {
+  return StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -128,3 +131,4 @@ const styles = StyleSheet.create({
     color: Colors.ink,
   },
 });
+}

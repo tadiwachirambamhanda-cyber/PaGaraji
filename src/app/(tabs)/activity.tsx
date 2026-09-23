@@ -1,17 +1,20 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useState, useMemo } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { CategoryTabs } from '@/components/category-tabs';
 import { ChatsList } from '@/components/chats-list';
 import { MyRequestsList } from '@/components/my-requests-list';
 import { NotificationsList } from '@/components/notifications-list';
 import { PageHeader } from '@/components/page-header';
+import { tapLight } from '@/lib/haptics';
 import { refreshAll } from '@/lib/refresh';
 import { useNotifications } from '@/lib/notifications';
 import { useUnreadCount } from '@/store/conversations';
 import { useMyRequests } from '@/store/my-requests';
-import { Colors, Spacing } from '@/theme';
+import { initialsOf, useProfile } from '@/store/profile';
+import { openSidebar } from '@/store/sidebar';
+import { Fonts, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
 const MODES = [
   { id: 'chats', label: 'Chats' },
@@ -21,12 +24,15 @@ const MODES = [
 type Mode = (typeof MODES)[number]['id'];
 
 export default function ActivityScreen() {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   const router = useRouter();
   const params = useLocalSearchParams<{ mode?: string }>();
   const [mode, setMode] = useState<Mode>('chats');
   const unread = useUnreadCount();
   const openRequests = useMyRequests().filter((r) => r.status === 'Open').length;
   const matchCount = useNotifications().length;
+  const profile = useProfile();
 
   useFocusEffect(
     useCallback(() => {
@@ -57,7 +63,19 @@ export default function ActivityScreen() {
 
   return (
     <View style={styles.screen}>
-      <PageHeader title="Activity" subtitle={subtitle} />
+      <PageHeader
+        title="Activity"
+        subtitle={subtitle}
+        top={
+          <View style={styles.topRow}>
+            <Pressable accessibilityLabel="Menu" hitSlop={8} onPress={() => { tapLight(); openSidebar(); }}>
+              <View style={styles.menuAvatar}>
+                <Text style={styles.menuAvatarText}>{initialsOf(profile.name)}</Text>
+              </View>
+            </Pressable>
+          </View>
+        }
+      />
       <View style={styles.tabs}>
         <CategoryTabs
           categories={MODES.map((m) => ({ ...m, label: counts[m.id] > 0 ? `${m.label} (${counts[m.id]})` : m.label }))}
@@ -74,10 +92,29 @@ export default function ActivityScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(Colors: ColorPalette) {
+  return StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: Colors.background,
+  },
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  menuAvatar: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    backgroundColor: Colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ rotate: '-4deg' }],
+  },
+  menuAvatarText: {
+    fontFamily: Fonts.headingBold,
+    fontSize: Type.caption,
+    color: Colors.tagInk,
   },
   tabs: {
     paddingLeft: Spacing.xl,
@@ -88,3 +125,4 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
   },
 });
+}

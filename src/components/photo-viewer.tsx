@@ -1,9 +1,9 @@
 import { Image } from 'expo-image';
-import { useRef, useState } from 'react';
+import { useRef, useState, useMemo } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type ImageSourcePropType } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Colors, Fonts, Spacing, Type } from '@/theme';
+import { Fonts, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
 type PhotoViewerProps = {
   sources: ImageSourcePropType[];
@@ -14,6 +14,8 @@ type PhotoViewerProps = {
 
 /** Full-screen photo pager on black. */
 export function PhotoViewer({ sources, index, onClose }: PhotoViewerProps) {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
@@ -55,7 +57,8 @@ export function PhotoViewer({ sources, index, onClose }: PhotoViewerProps) {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(Colors: ColorPalette) {
+  return StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: '#000000',
@@ -90,3 +93,4 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
 });
+}

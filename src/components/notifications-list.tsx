@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { Stitch } from '@/components/stitch';
@@ -6,7 +6,7 @@ import { useNotifications } from '@/lib/notifications';
 import { refreshAll } from '@/lib/refresh';
 import { useRemoteListingsHydrated } from '@/store/remote-listings';
 import { useRemoteRequestsHydrated } from '@/store/remote-requests';
-import { Colors, Fonts, Spacing, Type } from '@/theme';
+import { Fonts, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
 /** Matches between your open requests and current listings — bare, embeddable in Activity. */
 export function NotificationsList({ onSelect }: { onSelect: () => void }) {
@@ -16,6 +16,8 @@ export function NotificationsList({ onSelect }: { onSelect: () => void }) {
   const requestsHydrated = useRemoteRequestsHydrated();
   const hydrated = listingsHydrated && requestsHydrated;
   const [refreshing, setRefreshing] = useState(false);
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
 
   return (
     <FlatList
@@ -59,52 +61,54 @@ export function NotificationsList({ onSelect }: { onSelect: () => void }) {
   );
 }
 
-const styles = StyleSheet.create({
-  list: {
-    paddingHorizontal: Spacing.xl,
-    flexGrow: 1,
-  },
-  pressed: {
-    opacity: 0.6,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    paddingVertical: Spacing.lg,
-  },
-  rowContent: {
-    flex: 1,
-    gap: 2,
-  },
-  title: {
-    fontFamily: Fonts.headingBold,
-    fontSize: Type.body,
-    color: Colors.ink,
-  },
-  body: {
-    fontFamily: Fonts.bodyRegular,
-    fontSize: Type.small,
-    color: Colors.muted,
-  },
-  arrow: {
-    fontFamily: Fonts.bodyBold,
-    fontSize: Type.body,
-    color: Colors.header,
-  },
-  emptyState: {
-    paddingTop: Spacing.xl,
-    gap: Spacing.xs,
-  },
-  emptyTitle: {
-    fontFamily: Fonts.headingBold,
-    fontSize: Type.title,
-    color: Colors.ink,
-  },
-  emptyText: {
-    fontFamily: Fonts.bodyRegular,
-    fontSize: Type.small,
-    lineHeight: 19,
-    color: Colors.muted,
-  },
-});
+function createStyles(Colors: ColorPalette) {
+  return StyleSheet.create({
+    list: {
+      paddingHorizontal: Spacing.xl,
+      flexGrow: 1,
+    },
+    pressed: {
+      opacity: 0.6,
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.md,
+      paddingVertical: Spacing.lg,
+    },
+    rowContent: {
+      flex: 1,
+      gap: 2,
+    },
+    title: {
+      fontFamily: Fonts.headingBold,
+      fontSize: Type.body,
+      color: Colors.ink,
+    },
+    body: {
+      fontFamily: Fonts.bodyRegular,
+      fontSize: Type.small,
+      color: Colors.muted,
+    },
+    arrow: {
+      fontFamily: Fonts.bodyBold,
+      fontSize: Type.body,
+      color: Colors.ink,
+    },
+    emptyState: {
+      paddingTop: Spacing.xl,
+      gap: Spacing.xs,
+    },
+    emptyTitle: {
+      fontFamily: Fonts.headingBold,
+      fontSize: Type.title,
+      color: Colors.ink,
+    },
+    emptyText: {
+      fontFamily: Fonts.bodyRegular,
+      fontSize: Type.small,
+      lineHeight: 19,
+      color: Colors.muted,
+    },
+  });
+}

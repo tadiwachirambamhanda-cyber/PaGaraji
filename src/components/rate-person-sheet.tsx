@@ -1,21 +1,24 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { BottomSheet } from '@/components/bottom-sheet';
 import { Button } from '@/components/button';
 import { StarIcon } from '@/components/icons';
 import { tapLight } from '@/lib/haptics';
-import { Colors, Fonts, Spacing, Type } from '@/theme';
+import { Fonts, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
-type RateSellerSheetProps = {
+type RatePersonSheetProps = {
   visible: boolean;
   onClose: () => void;
-  sellerName: string;
+  personName: string;
   /** Returns an error message on failure, or null on success — the sheet closes itself on success. */
   onSubmit: (rating: number, comment: string) => Promise<string | null>;
 };
 
-export function RateSellerSheet({ visible, onClose, sellerName, onSubmit }: RateSellerSheetProps) {
+/** Rates whoever's on the other side of a deal — a buyer rating a seller, or a seller rating a buyer. */
+export function RatePersonSheet({ visible, onClose, personName, onSubmit }: RatePersonSheetProps) {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -36,8 +39,8 @@ export function RateSellerSheet({ visible, onClose, sellerName, onSubmit }: Rate
 
   return (
     <BottomSheet visible={visible} onClose={close}>
-      <Text style={styles.title}>Rate {sellerName}</Text>
-      <Text style={styles.subtitle}>How did it go? This helps other buyers trust the listing.</Text>
+      <Text style={styles.title}>Rate {personName}</Text>
+      <Text style={styles.subtitle}>How did it go? This helps other people trust who they’re dealing with.</Text>
       <View style={styles.stars}>
         {[1, 2, 3, 4, 5].map((value) => (
           <Pressable
@@ -70,7 +73,8 @@ export function RateSellerSheet({ visible, onClose, sellerName, onSubmit }: Rate
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(Colors: ColorPalette) {
+  return StyleSheet.create({
   title: {
     fontFamily: Fonts.headingBold,
     fontSize: Type.title,
@@ -100,3 +104,4 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
 });
+}

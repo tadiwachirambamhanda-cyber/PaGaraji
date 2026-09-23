@@ -1,12 +1,12 @@
 import { Image } from 'expo-image';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { PhotoViewer } from '@/components/photo-viewer';
 import { selectionChange } from '@/lib/haptics';
 import { deletePhotos, photoUri, pickFromLibrary, takePhoto } from '@/lib/photos';
 import { showAlert } from '@/lib/alert';
-import { Colors, Fonts, Spacing, Type } from '@/theme';
+import { Fonts, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
 type PhotoPickerProps = {
   /** Saved photo file names (see lib/photos). */
@@ -22,6 +22,8 @@ const TILE = 84;
 
 /** Row of photo tiles plus a dashed "add" tile. Tap a photo to view it, ✕ to remove. */
 export function PhotoPicker({ photos, onChange, max, hint, keep }: PhotoPickerProps) {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   const [busy, setBusy] = useState(false);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
@@ -103,7 +105,8 @@ export function PhotoPicker({ photos, onChange, max, hint, keep }: PhotoPickerPr
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(Colors: ColorPalette) {
+  return StyleSheet.create({
   wrap: {
     gap: Spacing.sm,
   },
@@ -134,7 +137,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.headingBold,
     fontSize: Type.heading,
     lineHeight: 26,
-    color: Colors.header,
+    color: Colors.ink,
   },
   addLabel: {
     fontFamily: Fonts.bodyBold,
@@ -166,3 +169,4 @@ const styles = StyleSheet.create({
     color: Colors.muted,
   },
 });
+}

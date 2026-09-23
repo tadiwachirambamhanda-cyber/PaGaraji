@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ArrowLeftIcon, ChatIcon, SendIcon, StarIcon } from '@/components/icons';
 import { LiveLocationPanel } from '@/components/live-location-panel';
-import { RateSellerSheet } from '@/components/rate-seller-sheet';
+import { RatePersonSheet } from '@/components/rate-person-sheet';
 import { showAlert } from '@/lib/alert';
 import { success, tapLight } from '@/lib/haptics';
 import { markConversationRead, sendChatMessage, useThreadMessages } from '@/lib/messages';
@@ -24,9 +24,11 @@ import { fetchMyReview, submitReview, type SellerReview } from '@/lib/reviews';
 import { useSession } from '@/store/auth';
 import { refreshConversations, useConversation } from '@/store/conversations';
 import { initialsOf } from '@/store/profile';
-import { Colors, Fonts, Spacing, Type } from '@/theme';
+import { Fonts, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
 export default function ChatThreadScreen() {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   const { id, draft: initialDraft } = useLocalSearchParams<{ id: string; draft?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -46,10 +48,10 @@ export default function ChatThreadScreen() {
     if (id) markConversationRead(id);
   }, [id, messageCount]);
 
-  // Only the buyer side of a thread can rate the seller — check once we know that's us.
+  // Either side of a thread can now rate the other.
   useEffect(() => {
-    if (id && conversation?.isBuyer) fetchMyReview(id).then(setMyReview);
-  }, [id, conversation?.isBuyer]);
+    if (id) fetchMyReview(id).then(setMyReview);
+  }, [id]);
 
   // The cached list might not have this thread yet (e.g. a fresh app start) — check the server
   // directly once rather than flashing "not found" while that first fetch is still in flight.
@@ -85,7 +87,7 @@ export default function ChatThreadScreen() {
     Linking.openURL(`https://wa.me/${conversation.listingSellerPhone}`);
   };
 
-  const rateSeller = async (rating: number, comment: string) => {
+  const rateOtherPerson = async (rating: number, comment: string) => {
     const problem = await submitReview(conversation.id, conversation.otherUserId, rating, comment);
     if (problem) {
       showAlert('Couldn’t submit your rating', problem);
@@ -130,15 +132,17 @@ export default function ChatThreadScreen() {
         )}
       </View>
 
-      {conversation.isBuyer && myReview === null && (
+      {myReview === null && (
         <Pressable
           style={({ pressed }) => [styles.rateBanner, pressed && styles.rateBannerPressed]}
           onPress={() => setRateSheetOpen(true)}>
           <StarIcon size={15} />
-          <Text style={styles.rateBannerText}>Bought something? Rate {conversation.otherName}</Text>
+          <Text style={styles.rateBannerText}>
+            {conversation.isBuyer ? `Bought something? Rate ${conversation.otherName}` : `Sold something? Rate ${conversation.otherName}`}
+          </Text>
         </Pressable>
       )}
-      {conversation.isBuyer && myReview && (
+      {myReview && (
         <View style={styles.rateBanner}>
           <StarIcon size={15} />
           <Text style={styles.rateBannerText}>
@@ -200,17 +204,18 @@ export default function ChatThreadScreen() {
         </Pressable>
       </View>
 
-      <RateSellerSheet
+      <RatePersonSheet
         visible={rateSheetOpen}
         onClose={() => setRateSheetOpen(false)}
-        sellerName={conversation.otherName}
-        onSubmit={rateSeller}
+        personName={conversation.otherName}
+        onSubmit={rateOtherPerson}
       />
     </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(Colors: ColorPalette) {
+  return StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -276,7 +281,7 @@ const styles = StyleSheet.create({
   headerListing: {
     fontFamily: Fonts.bodyMedium,
     fontSize: Type.caption,
-    color: Colors.header,
+    color: Colors.ink,
   },
   rateBanner: {
     flexDirection: 'row',
@@ -389,3 +394,4 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
 });
+}

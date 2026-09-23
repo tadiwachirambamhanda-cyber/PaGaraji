@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Linking, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -22,9 +22,11 @@ import { useAllListings, useMyListings } from '@/store/my-listings';
 import { toggleSaved, useIsSaved } from '@/store/saved-listings';
 import { useSession } from '@/store/auth';
 import { showAlert } from '@/lib/alert';
-import { Colors, Fonts, Spacing, Type } from '@/theme';
+import { Fonts, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
 export default function ListingDetailScreen() {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -305,7 +307,8 @@ export default function ListingDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(Colors: ColorPalette) {
+  return StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -382,7 +385,7 @@ const styles = StyleSheet.create({
   leadText: {
     fontFamily: Fonts.bodyMedium,
     fontSize: Type.small,
-    color: Colors.header,
+    color: Colors.ink,
     marginTop: Spacing.xs,
   },
   leadImport: {
@@ -439,7 +442,7 @@ const styles = StyleSheet.create({
   verified: {
     fontFamily: Fonts.bodyBold,
     fontSize: Type.small,
-    color: Colors.header,
+    color: Colors.ink,
   },
   sellerRating: {
     fontFamily: Fonts.bodyBold,
@@ -475,7 +478,7 @@ const styles = StyleSheet.create({
   shareText: {
     fontFamily: Fonts.bodyBold,
     fontSize: Type.small,
-    color: Colors.header,
+    color: Colors.ink,
     textDecorationLine: 'underline',
   },
   deleteLink: {
@@ -510,3 +513,4 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.md,
   },
 });
+}

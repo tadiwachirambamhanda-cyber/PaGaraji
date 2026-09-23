@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useMemo } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Button } from '@/components/button';
@@ -19,7 +19,7 @@ import {
   type SupplierStatus,
 } from '@/store/supplier';
 import { showAlert } from '@/lib/alert';
-import { Colors, Fonts, Spacing, Type } from '@/theme';
+import { Fonts, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
 const COUNTRIES: SupplierCountry[] = ['Zimbabwe', 'Dubai', 'China'];
 const LEAD_TIMES = ['Same day', '1-2 days', '5-7 days', '8-12 days', '2-3 weeks', '4+ weeks'].map((t) => ({
@@ -35,25 +35,30 @@ const WHATSAPP_HINT: Record<SupplierCountry, string> = {
   China: '8613800001234',
 };
 
-const STATUS_STAMP: Record<SupplierStatus, { label: string; color: string; note: string }> = {
-  pending: {
-    label: 'PENDING REVIEW',
-    color: Colors.importInk,
-    note: 'We check every supplier by hand before approving them. You can still edit your details.',
-  },
-  approved: {
-    label: 'APPROVED',
-    color: Colors.header,
-    note: 'Your listings now show a Verified supplier tag.',
-  },
-  rejected: {
-    label: 'NOT APPROVED',
-    color: Colors.danger,
-    note: 'This application wasn’t approved. Update your details and it goes back for review.',
-  },
-};
+function statusStampMap(Colors: ColorPalette): Record<SupplierStatus, { label: string; color: string; note: string }> {
+  return {
+    pending: {
+      label: 'PENDING REVIEW',
+      color: Colors.importInk,
+      note: 'We check every supplier by hand before approving them. You can still edit your details.',
+    },
+    approved: {
+      label: 'APPROVED',
+      color: Colors.ink,
+      note: 'Your listings now show a Verified supplier tag.',
+    },
+    rejected: {
+      label: 'NOT APPROVED',
+      color: Colors.danger,
+      note: 'This application wasn’t approved. Update your details and it goes back for review.',
+    },
+  };
+}
 
 export default function BecomeSupplierScreen() {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
+  const STATUS_STAMP = useMemo(() => statusStampMap(Colors), [Colors]);
   const router = useRouter();
   const existing = useSupplier();
 
@@ -214,7 +219,8 @@ export default function BecomeSupplierScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(Colors: ColorPalette) {
+  return StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -269,3 +275,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+}

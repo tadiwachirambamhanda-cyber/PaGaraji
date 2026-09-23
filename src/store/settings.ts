@@ -3,9 +3,11 @@ import { useSyncExternalStore } from 'react';
 
 const STORAGE_KEY = 'pagaraji.settings';
 
-export type Settings = { haptics: boolean; onboarded: boolean };
+export type ThemeMode = 'light' | 'dark';
 
-const DEFAULT_SETTINGS: Settings = { haptics: true, onboarded: false };
+export type Settings = { haptics: boolean; onboarded: boolean; themeMode: ThemeMode };
+
+const DEFAULT_SETTINGS: Settings = { haptics: true, onboarded: false, themeMode: 'light' };
 
 let settings: Settings = DEFAULT_SETTINGS;
 // Becomes true once saved settings have been read, so first-run checks don't flash for returning users.

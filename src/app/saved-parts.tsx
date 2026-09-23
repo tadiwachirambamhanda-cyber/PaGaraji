@@ -1,5 +1,5 @@
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useMemo } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
@@ -8,9 +8,11 @@ import { refreshAll } from '@/lib/refresh';
 import { useAllListings } from '@/store/my-listings';
 import { useRemoteListingsHydrated } from '@/store/remote-listings';
 import { useSavedIds } from '@/store/saved-listings';
-import { Colors, Fonts, Spacing, Type } from '@/theme';
+import { Fonts, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
 export default function SavedPartsScreen() {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   const savedIds = useSavedIds();
   const allListings = useAllListings();
   const hydrated = useRemoteListingsHydrated();
@@ -65,7 +67,8 @@ export default function SavedPartsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(Colors: ColorPalette) {
+  return StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -98,3 +101,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+}

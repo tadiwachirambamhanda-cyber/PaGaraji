@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -8,7 +9,7 @@ import type { Condition, Listing, Origin } from '@/data/listings';
 import { fitsVehicle } from '@/lib/fitment';
 import { selectionChange } from '@/lib/haptics';
 import { useVehicle, type Vehicle } from '@/store/vehicle';
-import { Colors, Fonts, Spacing, Type } from '@/theme';
+import { Fonts, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
 export type Filters = {
   minPrice: string;
@@ -60,6 +61,8 @@ type FilterSheetProps = {
 };
 
 export function FilterSheet({ visible, draft, onChangeDraft, baseListings, onApply, onClose }: FilterSheetProps) {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   const router = useRouter();
   const vehicle = useVehicle();
   const previewCount = applyFilters(baseListings, draft, vehicle).length;
@@ -165,7 +168,8 @@ export function FilterSheet({ visible, draft, onChangeDraft, baseListings, onApp
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(Colors: ColorPalette) {
+  return StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -215,7 +219,7 @@ const styles = StyleSheet.create({
   addVehicle: {
     fontFamily: Fonts.bodyBold,
     fontSize: Type.small,
-    color: Colors.header,
+    color: Colors.ink,
     textDecorationLine: 'underline',
   },
   chipRow: {
@@ -230,7 +234,7 @@ const styles = StyleSheet.create({
   },
   chipActive: {
     backgroundColor: Colors.header,
-    borderColor: Colors.header,
+    borderColor: Colors.ink,
   },
   chipInactive: {
     borderColor: Colors.line,
@@ -244,3 +248,4 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 });
+}

@@ -1,9 +1,10 @@
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
 
 import { BottomSheet } from '@/components/bottom-sheet';
 import { CheckIcon } from '@/components/icons';
 import { selectionChange } from '@/lib/haptics';
-import { Colors, Fonts, Spacing, Type } from '@/theme';
+import { Fonts, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
 export type SortKey = 'newest' | 'low' | 'high';
 
@@ -27,6 +28,8 @@ type SortSheetProps = {
 };
 
 export function SortSheet({ visible, value, onSelect, onClose }: SortSheetProps) {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   return (
     <BottomSheet visible={visible} onClose={onClose} gap={Spacing.xs}>
       <Text style={styles.title}>Sort by</Text>
@@ -49,7 +52,8 @@ export function SortSheet({ visible, value, onSelect, onClose }: SortSheetProps)
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(Colors: ColorPalette) {
+  return StyleSheet.create({
   title: {
     fontFamily: Fonts.headingBold,
     fontSize: Type.title,
@@ -74,6 +78,7 @@ const styles = StyleSheet.create({
   },
   labelActive: {
     fontFamily: Fonts.headingSemiBold,
-    color: Colors.header,
+    color: Colors.ink,
   },
 });
+}

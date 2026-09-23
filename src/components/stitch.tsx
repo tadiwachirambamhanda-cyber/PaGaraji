@@ -1,6 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 
-import { Colors } from '@/theme';
+import { useColors } from '@/theme';
 
 type StitchProps = {
   color?: string;
@@ -15,8 +15,9 @@ type StitchProps = {
  * dashed borders reliably when all four sides are drawn, so for `dashed` this
  * draws an oversized dashed box and clips it to a single edge.
  */
-export function Stitch({ color = Colors.line, thickness = 1.5, vertical = false, dashed = false }: StitchProps) {
-  const box = { borderColor: color, borderWidth: thickness, borderStyle: dashed ? ('dashed' as const) : ('solid' as const) };
+export function Stitch({ color, thickness = 1.5, vertical = false, dashed = false }: StitchProps) {
+  const Colors = useColors();
+  const box = { borderColor: color ?? Colors.line, borderWidth: thickness, borderStyle: dashed ? ('dashed' as const) : ('solid' as const) };
   return (
     <View
       style={vertical ? { width: thickness, overflow: 'hidden' } : { height: thickness, overflow: 'hidden' }}

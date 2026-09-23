@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Button } from '@/components/button';
@@ -8,7 +8,7 @@ import { SegmentedControl } from '@/components/segmented-control';
 import { success } from '@/lib/haptics';
 import { signInWithPassword, signUpWithPassword } from '@/store/auth';
 import type { AccountRole } from '@/store/profile';
-import { Colors, Fonts, Spacing, Type } from '@/theme';
+import { Fonts, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
 const MODES = ['Sign in', 'Create account'] as const;
 type Mode = (typeof MODES)[number];
@@ -19,6 +19,8 @@ type RoleChoice = (typeof ROLE_CHOICES)[number];
 const MIN_PASSWORD = 8;
 
 export default function SignInScreen() {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   const router = useRouter();
   const [mode, setMode] = useState<Mode>('Sign in');
   const [name, setName] = useState('');
@@ -157,7 +159,8 @@ export default function SignInScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(Colors: ColorPalette) {
+  return StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -196,6 +199,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.bodyMedium,
     fontSize: Type.small,
     lineHeight: 19,
-    color: Colors.header,
+    color: Colors.ink,
   },
 });
+}

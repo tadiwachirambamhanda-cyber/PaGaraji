@@ -1,8 +1,8 @@
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Colors, Fonts, Spacing, Type } from '@/theme';
+import { Fonts, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
 type PageHeaderProps = {
   title: string;
@@ -17,6 +17,8 @@ type PageHeaderProps = {
 /** Tab-level heading: big plain title on the paper background, no colour block. */
 export function PageHeader({ title, subtitle, top, children, compact }: PageHeaderProps) {
   const insets = useSafeAreaInsets();
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   return (
     <View style={[styles.wrap, { paddingTop: insets.top + Spacing.md }]}>
       {top}
@@ -27,30 +29,32 @@ export function PageHeader({ title, subtitle, top, children, compact }: PageHead
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: {
-    paddingHorizontal: Spacing.xl,
-    paddingBottom: Spacing.md,
-    backgroundColor: Colors.background,
-  },
-  title: {
-    fontFamily: Fonts.headingBold,
-    fontSize: Type.display,
-    lineHeight: 34,
-    color: Colors.ink,
-  },
-  titleCompact: {
-    fontSize: Type.heading,
-    lineHeight: 30,
-  },
-  titleAfterTop: {
-    marginTop: Spacing.md,
-  },
-  subtitle: {
-    fontFamily: Fonts.bodyRegular,
-    fontSize: Type.small,
-    lineHeight: 19,
-    color: Colors.muted,
-    marginTop: Spacing.xs,
-  },
-});
+function createStyles(Colors: ColorPalette) {
+  return StyleSheet.create({
+    wrap: {
+      paddingHorizontal: Spacing.xl,
+      paddingBottom: Spacing.md,
+      backgroundColor: Colors.background,
+    },
+    title: {
+      fontFamily: Fonts.headingBold,
+      fontSize: Type.display,
+      lineHeight: 34,
+      color: Colors.ink,
+    },
+    titleCompact: {
+      fontSize: Type.heading,
+      lineHeight: 30,
+    },
+    titleAfterTop: {
+      marginTop: Spacing.md,
+    },
+    subtitle: {
+      fontFamily: Fonts.bodyRegular,
+      fontSize: Type.small,
+      lineHeight: 19,
+      color: Colors.muted,
+      marginTop: Spacing.xs,
+    },
+  });
+}

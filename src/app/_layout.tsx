@@ -13,14 +13,18 @@ import { useFonts } from 'expo-font';
 import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
-import { useSettingsHydrated } from '@/store/settings';
+import { useSettings, useSettingsHydrated } from '@/store/settings';
+import { useColors, type ColorPalette } from '@/theme';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const hydrated = useSettingsHydrated();
+  const { themeMode } = useSettings();
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   const [fontsLoaded] = useFonts({
     ArchivoBlack_400Regular,
     Barlow_400Regular,
@@ -42,7 +46,7 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={DefaultTheme}>
-      <StatusBar style="dark" />
+      <StatusBar style={themeMode === 'dark' ? 'light' : 'dark'} />
       <View style={styles.backdrop}>
         <View style={styles.frame}>
           <Stack screenOptions={{ headerShown: false }}>
@@ -68,16 +72,21 @@ export default function RootLayout() {
 }
 
 // In a desktop browser the app sits in a phone-width column instead of stretching edge to edge.
-const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: Platform.OS === 'web' ? '#171310' : undefined,
-  },
-  frame: {
-    flex: 1,
-    width: '100%',
-    maxWidth: Platform.OS === 'web' ? 480 : undefined,
-    alignSelf: 'center',
-    overflow: 'hidden',
-  },
-});
+function createStyles(Colors: ColorPalette) {
+  return StyleSheet.create({
+    backdrop: {
+      flex: 1,
+      backgroundColor: Platform.OS === 'web' ? '#171310' : undefined,
+    },
+    frame: {
+      flex: 1,
+      width: '100%',
+      maxWidth: Platform.OS === 'web' ? 480 : undefined,
+      alignSelf: 'center',
+      overflow: 'hidden',
+      // Fills the gap during screen-transition animations so it matches the
+      // current theme instead of flashing whatever the OS window default is.
+      backgroundColor: Colors.background,
+    },
+  });
+}

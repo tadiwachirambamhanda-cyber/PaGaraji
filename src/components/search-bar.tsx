@@ -1,7 +1,8 @@
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { FilterIcon, SearchIcon } from '@/components/icons';
-import { Colors, Fonts, Spacing, Type } from '@/theme';
+import { Fonts, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
 type SearchBarProps = {
   placeholder: string;
@@ -25,6 +26,8 @@ export function SearchBar({
   onBlur,
   onSubmit,
 }: SearchBarProps) {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   return (
     <View style={styles.row}>
       <SearchIcon size={18} color={Colors.ink} />
@@ -54,35 +57,37 @@ export function SearchBar({
   );
 }
 
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    borderBottomWidth: 1.5,
-    borderBottomColor: Colors.ink,
-    paddingVertical: Spacing.sm,
-  },
-  input: {
-    flex: 1,
-    fontFamily: Fonts.bodyRegular,
-    fontSize: Type.body,
-    color: Colors.ink,
-    padding: 0,
-  },
-  filterButton: {
-    padding: 2,
-  },
-  pressed: {
-    opacity: 0.6,
-  },
-  filterDot: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.primary,
-  },
-});
+function createStyles(Colors: ColorPalette) {
+  return StyleSheet.create({
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.sm,
+      borderBottomWidth: 1.5,
+      borderBottomColor: Colors.ink,
+      paddingVertical: Spacing.sm,
+    },
+    input: {
+      flex: 1,
+      fontFamily: Fonts.bodyRegular,
+      fontSize: Type.body,
+      color: Colors.ink,
+      padding: 0,
+    },
+    filterButton: {
+      padding: 2,
+    },
+    pressed: {
+      opacity: 0.6,
+    },
+    filterDot: {
+      position: 'absolute',
+      top: 0,
+      right: 0,
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: Colors.primary,
+    },
+  });
+}

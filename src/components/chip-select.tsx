@@ -1,7 +1,8 @@
+import { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 
 import { selectionChange } from '@/lib/haptics';
-import { Colors, Fonts, Spacing, Type } from '@/theme';
+import { Fonts, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
 type ChipOption = { id: string; label: string };
 
@@ -13,6 +14,8 @@ type ChipSelectProps = {
 
 /** Scrolling row of stamp-style choices. */
 export function ChipSelect({ options, value, onChange }: ChipSelectProps) {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
       {options.map((option) => {
@@ -33,31 +36,33 @@ export function ChipSelect({ options, value, onChange }: ChipSelectProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  row: {
-    gap: Spacing.sm,
-  },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 10,
-    borderWidth: 1.5,
-  },
-  chipActive: {
-    backgroundColor: Colors.header,
-    borderColor: Colors.header,
-  },
-  chipInactive: {
-    borderColor: Colors.line,
-  },
-  label: {
-    fontFamily: Fonts.headingSemiBold,
-    fontSize: Type.small,
-  },
-  labelActive: {
-    color: '#FFFFFF',
-  },
-  labelInactive: {
-    color: Colors.ink,
-  },
-});
+function createStyles(Colors: ColorPalette) {
+  return StyleSheet.create({
+    row: {
+      gap: Spacing.sm,
+    },
+    chip: {
+      paddingHorizontal: 14,
+      paddingVertical: 9,
+      borderRadius: 10,
+      borderWidth: 1.5,
+    },
+    chipActive: {
+      backgroundColor: Colors.header,
+      borderColor: Colors.ink,
+    },
+    chipInactive: {
+      borderColor: Colors.line,
+    },
+    label: {
+      fontFamily: Fonts.headingSemiBold,
+      fontSize: Type.small,
+    },
+    labelActive: {
+      color: '#FFFFFF',
+    },
+    labelInactive: {
+      color: Colors.ink,
+    },
+  });
+}

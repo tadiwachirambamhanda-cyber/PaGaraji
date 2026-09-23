@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useMemo } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { PlusIcon } from '@/components/icons';
@@ -8,9 +8,11 @@ import { ListingCard } from '@/components/listing-card';
 import { refreshAll } from '@/lib/refresh';
 import { useMyListings } from '@/store/my-listings';
 import { useRemoteListingsHydrated } from '@/store/remote-listings';
-import { Colors, Fonts, Spacing, Type } from '@/theme';
+import { Fonts, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
 export default function MyListingsScreen() {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   const router = useRouter();
   const myListings = useMyListings();
   const hydrated = useRemoteListingsHydrated();
@@ -69,7 +71,8 @@ export default function MyListingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(Colors: ColorPalette) {
+  return StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -85,7 +88,7 @@ const styles = StyleSheet.create({
   postButtonText: {
     fontFamily: Fonts.bodyBold,
     fontSize: Type.small,
-    color: Colors.header,
+    color: Colors.ink,
     textDecorationLine: 'underline',
   },
   content: {
@@ -116,3 +119,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+}

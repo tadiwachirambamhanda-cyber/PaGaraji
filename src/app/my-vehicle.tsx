@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Button } from '@/components/button';
@@ -7,9 +7,11 @@ import { ScreenHeader } from '@/components/screen-header';
 import { success } from '@/lib/haptics';
 import { resetVehicle, saveVehicle, useVehicle } from '@/store/vehicle';
 import { showAlert } from '@/lib/alert';
-import { Colors, Fonts, Spacing, Type } from '@/theme';
+import { Fonts, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
 export default function MyVehicleScreen() {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   const router = useRouter();
   const existing = useVehicle();
   const [make, setMake] = useState(existing?.make ?? '');
@@ -85,7 +87,8 @@ export default function MyVehicleScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(Colors: ColorPalette) {
+  return StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -123,3 +126,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+}

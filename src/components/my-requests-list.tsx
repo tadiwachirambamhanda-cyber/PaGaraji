@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/button';
@@ -16,7 +16,7 @@ import { useSignedRequestPhotoUrls } from '@/lib/signed-urls';
 import { timeAgo } from '@/lib/time';
 import { matchListings, useMyRequests, type PartRequest } from '@/store/my-requests';
 import { useAllListings } from '@/store/my-listings';
-import { Colors, Fonts, Spacing, Type } from '@/theme';
+import { Fonts, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
 const CATEGORY_OPTIONS = [{ id: 'any', label: 'Any category' }, ...categories.filter((c) => c.id !== 'all')];
 
@@ -24,13 +24,15 @@ function categoryLabel(id: string) {
   return CATEGORY_OPTIONS.find((c) => c.id === id)?.label ?? 'Any category';
 }
 
-function statusColor(status: PartRequest['status']) {
+function statusColor(status: PartRequest['status'], Colors: ColorPalette) {
   if (status === 'Open') return Colors.header;
   if (status === 'Matched') return Colors.primary;
   return Colors.muted;
 }
 
 function RequestCard({ request }: { request: PartRequest }) {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   const router = useRouter();
   const allListings = useAllListings();
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
@@ -61,7 +63,7 @@ function RequestCard({ request }: { request: PartRequest }) {
         <Text style={styles.cardTitle} numberOfLines={2}>
           {request.partName}
         </Text>
-        <Stamp label={request.status.toUpperCase()} color={statusColor(request.status)} />
+        <Stamp label={request.status.toUpperCase()} color={statusColor(request.status, Colors)} />
       </View>
       <Text style={styles.cardMeta}>
         {[
@@ -148,6 +150,8 @@ function RequestCard({ request }: { request: PartRequest }) {
 
 /** Your posted requests — bare, embeddable in the Activity tab. */
 export function MyRequestsList({ onPostNew }: { onPostNew: () => void }) {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   const requests = useMyRequests();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -193,7 +197,8 @@ export function MyRequestsList({ onPostNew }: { onPostNew: () => void }) {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(Colors: ColorPalette) {
+  return StyleSheet.create({
   list: {
     padding: Spacing.xl,
     paddingBottom: Spacing.xxxl,
@@ -214,7 +219,7 @@ const styles = StyleSheet.create({
   offersRowText: {
     fontFamily: Fonts.bodyBold,
     fontSize: Type.small,
-    color: Colors.header,
+    color: Colors.ink,
   },
   cardGap: {
     marginVertical: Spacing.xl,
@@ -307,7 +312,7 @@ const styles = StyleSheet.create({
   matchArrow: {
     fontFamily: Fonts.bodyBold,
     fontSize: Type.small,
-    color: Colors.header,
+    color: Colors.ink,
   },
   actions: {
     flexDirection: 'row',
@@ -317,7 +322,7 @@ const styles = StyleSheet.create({
   actionText: {
     fontFamily: Fonts.bodyBold,
     fontSize: Type.small,
-    color: Colors.header,
+    color: Colors.ink,
     textDecorationLine: 'underline',
   },
   actionDanger: {
@@ -346,3 +351,4 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
   },
 });
+}

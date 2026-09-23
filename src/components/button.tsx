@@ -1,8 +1,8 @@
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
 
 import { tapLight } from '@/lib/haptics';
-import { Colors, Fonts, Spacing, Type } from '@/theme';
+import { Fonts, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
 type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'whatsapp';
 
@@ -14,11 +14,13 @@ type ButtonProps = {
 };
 
 export function Button({ label, onPress, variant = 'primary', icon }: ButtonProps) {
+  const Colors = useColors();
+  const { styles, variantStyles, variantLabelStyles } = useMemo(() => createStyles(Colors), [Colors]);
   return (
     <Pressable
       style={({ pressed }) => [
         styles.base,
-        VARIANT_STYLES[variant],
+        variantStyles[variant],
         pressed && styles.pressed,
       ]}
       onPress={() => {
@@ -26,41 +28,45 @@ export function Button({ label, onPress, variant = 'primary', icon }: ButtonProp
         onPress?.();
       }}>
       {icon}
-      <Text style={[styles.label, VARIANT_LABEL_STYLES[variant]]}>{label}</Text>
+      <Text style={[styles.label, variantLabelStyles[variant]]}>{label}</Text>
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
-  base: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    paddingVertical: Spacing.lg,
-    paddingHorizontal: Spacing.xl,
-    borderRadius: 12,
-  },
-  pressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.98 }],
-  },
-  label: {
-    fontFamily: Fonts.bodyBold,
-    fontSize: Type.body,
-  },
-});
+function createStyles(Colors: ColorPalette) {
+  const styles = StyleSheet.create({
+    base: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: Spacing.sm,
+      paddingVertical: Spacing.lg,
+      paddingHorizontal: Spacing.xl,
+      borderRadius: 12,
+    },
+    pressed: {
+      opacity: 0.85,
+      transform: [{ scale: 0.98 }],
+    },
+    label: {
+      fontFamily: Fonts.bodyBold,
+      fontSize: Type.body,
+    },
+  });
 
-const VARIANT_STYLES = StyleSheet.create({
-  primary: { backgroundColor: Colors.header },
-  secondary: { backgroundColor: Colors.accent },
-  outline: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: Colors.header },
-  whatsapp: { backgroundColor: Colors.whatsapp },
-});
+  const variantStyles = StyleSheet.create({
+    primary: { backgroundColor: Colors.header },
+    secondary: { backgroundColor: Colors.accent },
+    outline: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: Colors.ink },
+    whatsapp: { backgroundColor: Colors.whatsapp },
+  });
 
-const VARIANT_LABEL_STYLES = StyleSheet.create({
-  primary: { color: '#FFFFFF' },
-  secondary: { color: Colors.ink },
-  outline: { color: Colors.header },
-  whatsapp: { color: '#FFFFFF' },
-});
+  const variantLabelStyles = StyleSheet.create({
+    primary: { color: '#FFFFFF' },
+    secondary: { color: Colors.ink },
+    outline: { color: Colors.ink },
+    whatsapp: { color: '#FFFFFF' },
+  });
+
+  return { styles, variantStyles, variantLabelStyles };
+}

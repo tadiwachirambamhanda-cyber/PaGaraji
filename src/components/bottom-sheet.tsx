@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Colors, Radii, Shadows, Spacing } from '@/theme';
+import { Radii, Shadows, Spacing, useColors, type ColorPalette } from '@/theme';
 
 type BottomSheetProps = {
   visible: boolean;
@@ -26,6 +26,8 @@ type BottomSheetProps = {
  * dragged down (or flicked) to dismiss. Drag the handle at the top.
  */
 export function BottomSheet({ visible, onClose, children, gap = Spacing.lg, maxHeight }: BottomSheetProps) {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const travel = Math.max(height, 700);
@@ -99,7 +101,8 @@ export function BottomSheet({ visible, onClose, children, gap = Spacing.lg, maxH
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(Colors: ColorPalette) {
+  return StyleSheet.create({
   root: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -131,3 +134,4 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
 });
+}

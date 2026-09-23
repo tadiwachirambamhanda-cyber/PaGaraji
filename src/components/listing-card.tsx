@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -6,12 +7,15 @@ import { ListingImage } from '@/components/listing-image';
 import { Pop } from '@/components/pop';
 import { PriceTag } from '@/components/price-tag';
 import { Stamp, stampLabel } from '@/components/stamp';
+import { coordinateFor } from '@/data/city-coordinates';
 import type { Listing } from '@/data/listings';
+import { distanceKm, formatDistance } from '@/lib/geo';
 import { tapLight } from '@/lib/haptics';
 import { fitsVehicle } from '@/lib/fitment';
+import { useDeviceLocation } from '@/lib/location';
 import { toggleSaved, useIsSaved } from '@/store/saved-listings';
 import { useVehicle } from '@/store/vehicle';
-import { Colors, Fonts, Spacing, Type } from '@/theme';
+import { Fonts, Radii, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
 type ListingCardProps = {
   listing: Listing;
@@ -22,6 +26,8 @@ type ListingCardProps = {
 };
 
 function SaveButton({ id }: { id: string }) {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   const saved = useIsSaved(id);
   return (
     <Pressable
@@ -40,20 +46,31 @@ function SaveButton({ id }: { id: string }) {
 }
 
 export function ListingCard({ listing, variant = 'compact', half }: ListingCardProps) {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   const { id, title, fitment, price, condition, location, origin, sellerName, sold } = listing;
   const router = useRouter();
   const isImported = origin !== 'Local';
   const hero = variant === 'hero';
   const vehicle = useVehicle();
   const fits = !sold && fitsVehicle(listing, vehicle);
+  // Only shown once we have a real fix — a distance guessed from the Harare
+  // fallback would be misleading if location access was actually denied.
+  const { coordinate: myCoordinate, granted } = useDeviceLocation();
+  const listingCoordinate = coordinateFor(listing);
+  const distanceLabel = granted && listingCoordinate ? `${formatDistance(distanceKm(myCoordinate, listingCoordinate))} away` : location;
 
   return (
-    <Pressable style={({ pressed }) => [styles.card, half ? styles.half : styles.fill, sold && styles.sold, pressed && styles.pressed]} onPress={() => router.push(`/listing/${id}`)}>
+    <Pressable
+      style={({ pressed }) => [styles.card, hero ? styles.cardHero : styles.cardCompact, half ? styles.half : styles.fill, sold && styles.sold, pressed && styles.pressed]}
+      onPress={() => router.push(`/listing/${id}`)}>
       <View style={[styles.photo, hero ? styles.photoHero : styles.photoCompact]}>
         <ListingImage listing={listing} height={hero ? 190 : 108} iconSize={hero ? 56 : 38} />
-        <View style={styles.tag}>
-          <PriceTag price={price} size={hero ? 'lg' : 'md'} />
-        </View>
+        {hero && (
+          <View style={styles.tag}>
+            <PriceTag price={price} size="lg" />
+          </View>
+        )}
         {sold ? (
           <View style={styles.stamp}>
             <Stamp label="SOLD" color={Colors.danger} />
@@ -84,13 +101,20 @@ export function ListingCard({ listing, variant = 'compact', half }: ListingCardP
           {fitment}
         </Text>
       )}
-      <Text style={[styles.meta, isImported && styles.metaImport]} numberOfLines={1}>
-        {hero
-          ? `${sellerName} · ${condition}`
-          : isImported
-            ? `${origin} import · ${condition}`
-            : `${condition} · ${location}`}
-      </Text>
+      {hero ? (
+        <Text style={[styles.meta, isImported && styles.metaImport]} numberOfLines={1}>
+          {sellerName} · {condition}
+        </Text>
+      ) : (
+        <View style={styles.compactMetaRow}>
+          <View style={styles.pricePill}>
+            <Text style={styles.pricePillText}>${price}</Text>
+          </View>
+          <Text style={[styles.compactMetaRight, isImported && styles.metaImport]} numberOfLines={1}>
+            {isImported ? `${origin} import` : distanceLabel}
+          </Text>
+        </View>
+      )}
       {fits && vehicle && (
         <Text style={styles.fits} numberOfLines={1}>
           ✓ Fits your {vehicle.model}
@@ -100,9 +124,19 @@ export function ListingCard({ listing, variant = 'compact', half }: ListingCardP
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(Colors: ColorPalette) {
+  return StyleSheet.create({
   card: {
     gap: 2,
+  },
+  cardHero: {},
+  // A bordered, padded "toolbox card" — the Workshop mock's compact listing look.
+  cardCompact: {
+    borderWidth: 2,
+    borderColor: Colors.ink,
+    borderRadius: Radii.md,
+    backgroundColor: Colors.card,
+    padding: Spacing.sm,
   },
   fill: {
     flex: 1,
@@ -125,7 +159,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   photoCompact: {
-    borderRadius: 14,
+    borderRadius: Radii.chip,
   },
   tag: {
     position: 'absolute',
@@ -172,12 +206,35 @@ const styles = StyleSheet.create({
     fontSize: Type.small,
     color: Colors.muted,
   },
+  compactMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 2,
+  },
+  pricePill: {
+    backgroundColor: Colors.header,
+    borderRadius: Radii.sm,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  pricePillText: {
+    fontFamily: Fonts.headingBold,
+    fontSize: Type.caption,
+    color: Colors.accent,
+  },
+  compactMetaRight: {
+    fontFamily: Fonts.bodyBold,
+    fontSize: Type.caption,
+    color: Colors.muted,
+  },
   fits: {
     fontFamily: Fonts.bodyBold,
     fontSize: Type.small,
-    color: Colors.header,
+    color: Colors.ink,
   },
   metaImport: {
     color: Colors.importInk,
   },
 });
+}

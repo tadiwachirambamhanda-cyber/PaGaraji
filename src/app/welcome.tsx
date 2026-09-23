@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,7 +11,7 @@ import { Stamp } from '@/components/stamp';
 import { Stitch } from '@/components/stitch';
 import { saveProfile, useProfile } from '@/store/profile';
 import { updateSettings } from '@/store/settings';
-import { Colors, Fonts, Spacing, Type } from '@/theme';
+import { Fonts, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
 const CITY_OPTIONS = ZIMBABWE_CITIES.map((c) => ({ id: c, label: c }));
 
@@ -22,6 +23,8 @@ const POINTS = [
 
 /** Shown once, on first launch. */
 export default function WelcomeScreen() {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const profile = useProfile();
@@ -65,7 +68,8 @@ export default function WelcomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(Colors: ColorPalette) {
+  return StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -113,3 +117,4 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
   },
 });
+}

@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { BottomSheet } from '@/components/bottom-sheet';
 import { Button } from '@/components/button';
 import { LocationIcon } from '@/components/icons';
 import { useDeviceLocation, type Coordinate } from '@/lib/location';
-import { Colors, Fonts, Radii, Spacing, Type } from '@/theme';
+import { Fonts, Radii, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
 // react-native-maps has no web renderer — only require it off web.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -32,6 +32,8 @@ function PickerSheet({
   onConfirm: (coordinate: Coordinate) => void;
   onClose: () => void;
 }) {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   const [pending, setPending] = useState<Coordinate>(initial);
 
   if (!Maps) return null;
@@ -44,6 +46,7 @@ function PickerSheet({
       <View style={styles.mapBox}>
         <MapView
           style={StyleSheet.absoluteFill}
+          userInterfaceStyle={Platform.OS === 'ios' ? 'dark' : undefined}
           initialRegion={{ ...initial, latitudeDelta: 0.05, longitudeDelta: 0.05 }}
           onRegionChangeComplete={(region: { latitude: number; longitude: number }) =>
             setPending({ latitude: region.latitude, longitude: region.longitude })
@@ -58,6 +61,8 @@ function PickerSheet({
 
 /** "Pin your location (optional)" row for the Request form — opens a map to drop a pin. */
 export function LocationPickerMap({ value, onChange }: LocationPickerMapProps) {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   const [sheetOpen, setSheetOpen] = useState(false);
   const { coordinate: deviceCoordinate } = useDeviceLocation();
 
@@ -94,7 +99,8 @@ export function LocationPickerMap({ value, onChange }: LocationPickerMapProps) {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(Colors: ColorPalette) {
+  return StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -108,7 +114,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: Fonts.bodyBold,
     fontSize: Type.small,
-    color: Colors.header,
+    color: Colors.ink,
   },
   remove: {
     fontFamily: Fonts.bodyBold,
@@ -153,3 +159,4 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '45deg' }],
   },
 });
+}

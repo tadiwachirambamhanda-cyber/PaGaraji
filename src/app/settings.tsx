@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import Constants from 'expo-constants';
 import type { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
@@ -10,7 +11,7 @@ import { useMyRequests } from '@/store/my-requests';
 import { resetSaved, useSavedIds } from '@/store/saved-listings';
 import { updateSettings, useSettings } from '@/store/settings';
 import { showAlert } from '@/lib/alert';
-import { Colors, Fonts, Spacing, Type } from '@/theme';
+import { Fonts, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
 function confirm(title: string, message: string, actionLabel: string, onConfirm: () => void) {
   showAlert(title, message, [
@@ -20,6 +21,8 @@ function confirm(title: string, message: string, actionLabel: string, onConfirm:
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -43,6 +46,8 @@ function Row({
   onPress?: () => void;
   right?: ReactNode;
 }) {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   return (
     <Pressable
       disabled={!onPress}
@@ -55,6 +60,8 @@ function Row({
 }
 
 export default function SettingsScreen() {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   const settings = useSettings();
   const savedCount = useSavedIds().size;
   const requestCount = useMyRequests().length;
@@ -67,13 +74,26 @@ export default function SettingsScreen() {
         <Section title="Preferences">
           <Row
             label="Haptic feedback"
-            last
             right={
               <Switch
                 value={settings.haptics}
                 onValueChange={(value) => {
                   updateSettings({ haptics: value });
                   if (value) tapLight();
+                }}
+                trackColor={{ true: Colors.header, false: Colors.border }}
+              />
+            }
+          />
+          <Row
+            label="Dark mode"
+            last
+            right={
+              <Switch
+                value={settings.themeMode === 'dark'}
+                onValueChange={(value) => {
+                  updateSettings({ themeMode: value ? 'dark' : 'light' });
+                  tapLight();
                 }}
                 trackColor={{ true: Colors.header, false: Colors.border }}
               />
@@ -125,7 +145,8 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(Colors: ColorPalette) {
+  return StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -175,3 +196,4 @@ const styles = StyleSheet.create({
     color: Colors.muted,
   },
 });
+}

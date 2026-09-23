@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Button } from '@/components/button';
@@ -13,21 +13,27 @@ import { showAlert } from '@/lib/alert';
 import { success, tapLight } from '@/lib/haptics';
 import {
   acceptOffer,
+  cancelMatch,
+  counterOffer,
   fetchMyOffer,
   fetchOffersForRequest,
+  respondToCounterOffer,
   submitOffer,
   withdrawOffer,
   type RequestOffer,
 } from '@/lib/offers';
+import { fetchCategoryPriceGuidance, type PriceGuidance } from '@/lib/price-guidance';
+import { presenceLabel } from '@/lib/presence';
+import { fetchBuyerRating } from '@/lib/reviews';
 import { useSignedRequestPhotoUrls } from '@/lib/signed-urls';
 import { useSession } from '@/store/auth';
 import { useConversationForRequest } from '@/store/conversations';
 import { useMyRequests } from '@/store/my-requests';
 import { useOpenRequests } from '@/store/open-requests';
 import { initialsOf } from '@/store/profile';
-import { Colors, Fonts, Spacing, Type } from '@/theme';
+import { Fonts, Radii, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
-function statusColor(status: 'Open' | 'Matched' | 'Closed') {
+function statusColor(status: 'Open' | 'Matched' | 'Closed', Colors: ColorPalette) {
   if (status === 'Open') return Colors.header;
   if (status === 'Matched') return Colors.primary;
   return Colors.muted;
@@ -36,18 +42,35 @@ function statusColor(status: 'Open' | 'Matched' | 'Closed') {
 function OfferCard({
   offer,
   onAccept,
+  onCounter,
   accepting,
+  countering,
 }: {
   offer: RequestOffer;
   onAccept: () => void;
+  onCounter: (price: number) => void;
   accepting: boolean;
+  countering: boolean;
 }) {
-  const declined = offer.status === 'declined' || offer.status === 'withdrawn';
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
+  const declined = offer.status === 'declined' || offer.status === 'withdrawn' || offer.status === 'cancelled';
+  const [counterOpen, setCounterOpen] = useState(false);
+  const [counterPrice, setCounterPrice] = useState('');
+  const activeNow = presenceLabel(offer.sellerLastActiveAt) === 'Active now';
+
+  const sendCounter = () => {
+    const value = Number(counterPrice);
+    if (!Number.isFinite(value) || value <= 0) return;
+    onCounter(value);
+  };
+
   return (
     <View style={[styles.offerCard, declined && styles.offerCardDeclined]}>
       <View style={styles.offerTop}>
         <View style={styles.offerAvatar}>
           <Text style={styles.offerAvatarText}>{initialsOf(offer.sellerName ?? '')}</Text>
+          {activeNow && <View style={styles.activeDot} accessibilityLabel="Active now" />}
         </View>
         <View style={styles.offerSeller}>
           <Text style={styles.offerSellerName} numberOfLines={1}>
@@ -68,6 +91,16 @@ function OfferCard({
               <Text style={styles.offerRatingText}>New seller</Text>
             )}
           </View>
+          {(offer.avgResponseMinutes !== undefined || offer.winRate !== undefined) && (
+            <Text style={styles.offerStatsText} numberOfLines={1}>
+              {[
+                offer.avgResponseMinutes !== undefined ? `Responds in ~${offer.avgResponseMinutes}m` : null,
+                offer.winRate !== undefined ? `Wins ${offer.winRate}%` : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </Text>
+          )}
         </View>
         <Text style={styles.offerPrice}>${offer.price}</Text>
       </View>
@@ -78,9 +111,33 @@ function OfferCard({
         <Text style={styles.offerDeclinedText}>Declined</Text>
       ) : offer.status === 'withdrawn' ? (
         <Text style={styles.offerDeclinedText}>Withdrawn</Text>
+      ) : offer.status === 'cancelled' ? (
+        <Text style={styles.offerDeclinedText}>Match cancelled</Text>
+      ) : offer.status === 'countered' ? (
+        <Text style={styles.offerDeclinedText}>You countered ${offer.counterPrice} — waiting for a reply</Text>
+      ) : counterOpen ? (
+        <View style={styles.counterRow}>
+          <TextInput
+            style={styles.counterInput}
+            placeholder="Your price"
+            placeholderTextColor={Colors.placeholder}
+            keyboardType="decimal-pad"
+            value={counterPrice}
+            onChangeText={setCounterPrice}
+            autoFocus
+          />
+          <Pressable style={({ pressed }) => [styles.counterSend, pressed && styles.pressed]} onPress={sendCounter}>
+            <Text style={styles.counterSendText}>{countering ? '…' : 'Send'}</Text>
+          </Pressable>
+        </View>
       ) : (
-        <View style={styles.offerAcceptButton}>
-          <Button label={accepting ? 'One moment…' : 'Accept offer'} variant="primary" onPress={onAccept} />
+        <View style={styles.offerActions}>
+          <View style={styles.offerAcceptFlex}>
+            <Button label={accepting ? 'One moment…' : 'Accept offer'} variant="primary" onPress={onAccept} />
+          </View>
+          <Pressable style={({ pressed }) => [styles.counterLink, pressed && styles.pressed]} onPress={() => setCounterOpen(true)}>
+            <Text style={styles.counterLinkText}>Counter</Text>
+          </Pressable>
         </View>
       )}
     </View>
@@ -88,6 +145,8 @@ function OfferCard({
 }
 
 export default function RequestDetailScreen() {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const session = useSession();
@@ -101,11 +160,17 @@ export default function RequestDetailScreen() {
   const [offers, setOffers] = useState<RequestOffer[]>([]);
   const [offersLoading, setOffersLoading] = useState(true);
   const [accepting, setAccepting] = useState<string | null>(null);
+  const [countering, setCountering] = useState<string | null>(null);
+  const [respondingToCounter, setRespondingToCounter] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   // undefined: not checked yet. null: checked, no offer of yours exists.
   const [myOffer, setMyOffer] = useState<RequestOffer | null | undefined>(undefined);
   const [price, setPrice] = useState('');
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // The buyer's reputation, shown to a prospective seller deciding whether to bid.
+  const [buyerRating, setBuyerRating] = useState<{ avgRating: number; reviewCount: number } | null | undefined>(undefined);
+  const [priceGuidance, setPriceGuidance] = useState<PriceGuidance | null>(null);
 
   const signedUrls = useSignedRequestPhotoUrls(request?.photos ?? []);
   const photoSources = signedUrls.filter((uri) => uri !== '').map((uri) => ({ uri }));
@@ -126,6 +191,16 @@ export default function RequestDetailScreen() {
     if (!id || isOwn) return;
     fetchMyOffer(id).then(setMyOffer);
   }, [id, isOwn]);
+
+  useEffect(() => {
+    if (isOwn || !request?.userId) return;
+    fetchBuyerRating(request.userId).then(setBuyerRating);
+  }, [isOwn, request?.userId]);
+
+  useEffect(() => {
+    if (isOwn || !request?.categoryId) return;
+    fetchCategoryPriceGuidance(request.categoryId).then(setPriceGuidance);
+  }, [isOwn, request?.categoryId]);
 
   useEffect(() => {
     // Seeds the price field from the request's budget exactly once, when it first
@@ -185,14 +260,70 @@ export default function RequestDetailScreen() {
     setMyOffer({ ...myOffer, status: 'withdrawn' });
   };
 
+  const counter = async (offerId: string, value: number) => {
+    setCountering(offerId);
+    const problem = await counterOffer(offerId, value);
+    setCountering(null);
+    if (problem) {
+      showAlert('Couldn’t send your counter', problem);
+      return;
+    }
+    success();
+    setOffers(await fetchOffersForRequest(request.id));
+  };
+
+  const respondToCounter = async (accept: boolean) => {
+    if (!myOffer || respondingToCounter) return;
+    setRespondingToCounter(true);
+    const result = await respondToCounterOffer(myOffer.id, accept);
+    setRespondingToCounter(false);
+    if ('error' in result) {
+      showAlert('Couldn’t respond to the counter', result.error);
+      return;
+    }
+    success();
+    if (accept && result.conversationId) {
+      router.push(`/chat/${result.conversationId}`);
+      return;
+    }
+    setMyOffer(await fetchMyOffer(request.id));
+  };
+
+  const cancelMatchConfirmed = async () => {
+    if (cancelling) return;
+    setCancelling(true);
+    const problem = await cancelMatch(request.id);
+    setCancelling(false);
+    if (problem) {
+      showAlert('Couldn’t cancel the match', problem);
+      return;
+    }
+    success();
+    if (isOwn) setOffers(await fetchOffersForRequest(request.id));
+    else setMyOffer(await fetchMyOffer(request.id));
+  };
+
+  const confirmCancelMatch = () =>
+    showAlert('Cancel this match?', `“${request.partName}” will reopen for new offers. This can’t be undone.`, [
+      { text: 'Never mind', style: 'cancel' },
+      { text: 'Cancel match', style: 'destructive', onPress: cancelMatchConfirmed },
+    ]);
+
+  const canCancelMatch = request.status === 'Matched' && (isOwn || myOffer?.status === 'accepted');
+
   return (
     <View style={styles.screen}>
       <ScreenHeader title={request.partName} />
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.statusRow}>
-          <Stamp label={request.status.toUpperCase()} color={statusColor(request.status)} />
+          <Stamp label={request.status.toUpperCase()} color={statusColor(request.status, Colors)} />
           {request.budget !== undefined && <Text style={styles.budget}>Budget: ${request.budget}</Text>}
         </View>
+        {canCancelMatch && (
+          <Pressable hitSlop={8} onPress={confirmCancelMatch} disabled={cancelling}>
+            <Text style={styles.withdrawText}>{cancelling ? 'One moment…' : 'Cancel this match'}</Text>
+          </Pressable>
+        )}
         <Text style={styles.meta}>
           {[
             request.vehicle || null,
@@ -201,6 +332,14 @@ export default function RequestDetailScreen() {
             .filter(Boolean)
             .join(' · ')}
         </Text>
+        {!isOwn && buyerRating !== undefined && (
+          <View style={styles.buyerRatingRow}>
+            <StarIcon size={13} color={buyerRating ? undefined : Colors.muted} />
+            <Text style={styles.buyerRatingText}>
+              {buyerRating ? `Posted by a buyer rated ${buyerRating.avgRating.toFixed(1)} (${buyerRating.reviewCount})` : 'Posted by a new buyer'}
+            </Text>
+          </View>
+        )}
         {request.notes !== '' && <Text style={styles.notes}>{request.notes}</Text>}
 
         {photoSources.length > 0 && (
@@ -231,7 +370,14 @@ export default function RequestDetailScreen() {
               </View>
             ) : (
               offers.map((offer) => (
-                <OfferCard key={offer.id} offer={offer} accepting={accepting === offer.id} onAccept={() => accept(offer.id)} />
+                <OfferCard
+                  key={offer.id}
+                  offer={offer}
+                  accepting={accepting === offer.id}
+                  countering={countering === offer.id}
+                  onAccept={() => accept(offer.id)}
+                  onCounter={(value) => counter(offer.id, value)}
+                />
               ))
             )}
           </>
@@ -248,13 +394,27 @@ export default function RequestDetailScreen() {
                   ? '✓ Accepted — say hello in chat'
                   : myOffer.status === 'declined'
                     ? 'Not chosen this time'
-                    : 'Waiting for a reply'}
+                    : myOffer.status === 'cancelled'
+                      ? 'This deal was cancelled'
+                      : myOffer.status === 'countered'
+                        ? `Buyer countered: $${myOffer.counterPrice}`
+                        : 'Waiting for a reply'}
               </Text>
             </View>
             {myOffer.status === 'pending' && (
               <Pressable style={({ pressed }) => [styles.withdrawLink, pressed && styles.pressed]} onPress={withdraw}>
                 <Text style={styles.withdrawText}>Withdraw offer</Text>
               </Pressable>
+            )}
+            {myOffer.status === 'countered' && (
+              <View style={styles.offerActions}>
+                <View style={styles.offerAcceptFlex}>
+                  <Button label={respondingToCounter ? 'One moment…' : 'Accept counter'} variant="primary" onPress={() => respondToCounter(true)} />
+                </View>
+                <Pressable style={({ pressed }) => [styles.counterLink, pressed && styles.pressed]} onPress={() => respondToCounter(false)}>
+                  <Text style={styles.counterLinkText}>Decline</Text>
+                </Pressable>
+              </View>
             )}
             {myOffer.status === 'accepted' && myConversation && (
               <View style={styles.offerAcceptButton}>
@@ -284,6 +444,11 @@ export default function RequestDetailScreen() {
                 value={price}
                 onChangeText={setPrice}
               />
+              {priceGuidance && (
+                <Text style={styles.priceGuidanceText}>
+                  Similar parts closed at ${priceGuidance.minPrice}–${priceGuidance.maxPrice} recently (avg ${priceGuidance.avgPrice})
+                </Text>
+              )}
             </View>
             <View style={styles.field}>
               <Text style={styles.label}>Message (optional)</Text>
@@ -305,7 +470,8 @@ export default function RequestDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(Colors: ColorPalette) {
+  return StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -335,6 +501,16 @@ const styles = StyleSheet.create({
     color: Colors.ink,
   },
   meta: {
+    fontFamily: Fonts.bodyMedium,
+    fontSize: Type.small,
+    color: Colors.muted,
+  },
+  buyerRatingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  buyerRatingText: {
     fontFamily: Fonts.bodyMedium,
     fontSize: Type.small,
     color: Colors.muted,
@@ -410,6 +586,18 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.header,
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
+  },
+  activeDot: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    backgroundColor: Colors.success,
+    borderWidth: 2,
+    borderColor: Colors.background,
   },
   offerAvatarText: {
     fontFamily: Fonts.headingBold,
@@ -433,12 +621,18 @@ const styles = StyleSheet.create({
   offerVerified: {
     fontFamily: Fonts.bodyBold,
     fontSize: Type.caption,
-    color: Colors.header,
+    color: Colors.ink,
   },
   offerRatingText: {
     fontFamily: Fonts.bodyMedium,
     fontSize: Type.caption,
     color: Colors.muted,
+  },
+  offerStatsText: {
+    fontFamily: Fonts.bodyRegular,
+    fontSize: Type.caption,
+    color: Colors.muted,
+    marginTop: 1,
   },
   offerPrice: {
     fontFamily: Fonts.headingBold,
@@ -454,7 +648,7 @@ const styles = StyleSheet.create({
   offerAccepted: {
     fontFamily: Fonts.bodyBold,
     fontSize: Type.small,
-    color: Colors.header,
+    color: Colors.ink,
   },
   offerDeclinedText: {
     fontFamily: Fonts.bodyMedium,
@@ -463,6 +657,51 @@ const styles = StyleSheet.create({
   },
   offerAcceptButton: {
     marginTop: Spacing.xs,
+  },
+  offerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    marginTop: Spacing.xs,
+  },
+  offerAcceptFlex: {
+    flex: 1,
+  },
+  counterLink: {
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
+  },
+  counterLinkText: {
+    fontFamily: Fonts.bodyBold,
+    fontSize: Type.small,
+    color: Colors.ink,
+    textDecorationLine: 'underline',
+  },
+  counterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginTop: Spacing.xs,
+  },
+  counterInput: {
+    flex: 1,
+    borderBottomWidth: 1.5,
+    borderBottomColor: Colors.ink,
+    paddingVertical: Spacing.xs,
+    fontFamily: Fonts.bodyRegular,
+    fontSize: Type.body,
+    color: Colors.ink,
+  },
+  counterSend: {
+    backgroundColor: Colors.header,
+    borderRadius: Radii.sm,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+  },
+  counterSendText: {
+    fontFamily: Fonts.bodyBold,
+    fontSize: Type.small,
+    color: '#FFFFFF',
   },
   myOfferCard: {
     borderWidth: 1.5,
@@ -479,7 +718,7 @@ const styles = StyleSheet.create({
   myOfferStatus: {
     fontFamily: Fonts.bodyBold,
     fontSize: Type.small,
-    color: Colors.header,
+    color: Colors.ink,
   },
   withdrawLink: {
     marginTop: Spacing.md,
@@ -514,4 +753,10 @@ const styles = StyleSheet.create({
     minHeight: 64,
     textAlignVertical: 'top',
   },
+  priceGuidanceText: {
+    fontFamily: Fonts.bodyRegular,
+    fontSize: Type.caption,
+    color: Colors.muted,
+  },
 });
+}

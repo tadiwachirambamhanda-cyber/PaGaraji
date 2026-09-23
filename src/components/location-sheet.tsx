@@ -1,8 +1,9 @@
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
 
 import { BottomSheet } from '@/components/bottom-sheet';
 import { CheckIcon, LocationIcon } from '@/components/icons';
-import { Colors, Fonts, Spacing, Type } from '@/theme';
+import { Fonts, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
 export const ZIMBABWE_CITIES = ['Harare', 'Bulawayo', 'Mutare', 'Gweru', 'Kwekwe', 'Masvingo'];
 
@@ -14,6 +15,8 @@ type LocationSheetProps = {
 };
 
 export function LocationSheet({ visible, value, onSelect, onClose }: LocationSheetProps) {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   return (
     <BottomSheet visible={visible} onClose={onClose} gap={Spacing.xs}>
         <Text style={styles.title}>Choose your city</Text>
@@ -34,7 +37,8 @@ export function LocationSheet({ visible, value, onSelect, onClose }: LocationShe
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(Colors: ColorPalette) {
+  return StyleSheet.create({
   title: {
     fontFamily: Fonts.headingBold,
     fontSize: Type.title,
@@ -60,6 +64,7 @@ const styles = StyleSheet.create({
   },
   cityTextActive: {
     fontFamily: Fonts.headingSemiBold,
-    color: Colors.header,
+    color: Colors.ink,
   },
 });
+}

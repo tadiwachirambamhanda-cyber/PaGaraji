@@ -1,5 +1,5 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -22,8 +22,11 @@ import { ScreenHeader } from '@/components/screen-header';
 import { SegmentedControl } from '@/components/segmented-control';
 import { Stitch } from '@/components/stitch';
 import { categories } from '@/data/categories';
+import { coordinateFor } from '@/data/city-coordinates';
+import { distanceKm, formatDistance } from '@/lib/geo';
 import { success } from '@/lib/haptics';
-import type { Coordinate } from '@/lib/location';
+import { useDeviceLocation, type Coordinate } from '@/lib/location';
+import { fetchCategoryPriceGuidance, type PriceGuidance } from '@/lib/price-guidance';
 import { refreshAll } from '@/lib/refresh';
 import { createRequest } from '@/lib/request-actions';
 import { backendEnabled } from '@/lib/supabase';
@@ -34,7 +37,7 @@ import { useOpenRequests, useOpenRequestsHydrated } from '@/store/open-requests'
 import { type PartRequest, type RequestSource } from '@/store/my-requests';
 import { isApprovedSupplier, useSupplier } from '@/store/supplier';
 import { showAlert } from '@/lib/alert';
-import { Colors, Fonts, Spacing, Type } from '@/theme';
+import { Fonts, Radii, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
 const SOURCES: RequestSource[] = ['Any', 'Local', 'Import'];
 const MODES = [
@@ -51,7 +54,13 @@ function categoryLabel(id: string) {
 }
 
 function BrowseCard({ request }: { request: PartRequest }) {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   const router = useRouter();
+  const { coordinate: myCoordinate } = useDeviceLocation();
+  const requestCoordinate = coordinateFor(request);
+  const distance = requestCoordinate ? formatDistance(distanceKm(myCoordinate, requestCoordinate)) : null;
+
   return (
     <Pressable style={({ pressed }) => [styles.card, pressed && styles.pressed]} onPress={() => router.push(`/request/${request.id}`)}>
       <View style={styles.cardTop}>
@@ -61,7 +70,12 @@ function BrowseCard({ request }: { request: PartRequest }) {
         {request.budget !== undefined && <Text style={styles.browseBudget}>${request.budget}</Text>}
       </View>
       <Text style={styles.cardMeta}>
-        {[request.vehicle || null, request.source === 'Any' ? 'Local or import' : request.source, categoryLabel(request.categoryId)]
+        {[
+          request.vehicle || null,
+          request.source === 'Any' ? 'Local or import' : request.source,
+          categoryLabel(request.categoryId),
+          distance ? `${distance} away` : null,
+        ]
           .filter(Boolean)
           .join(' · ')}
       </Text>
@@ -79,8 +93,23 @@ function BrowseCard({ request }: { request: PartRequest }) {
 }
 
 function BrowsePanel() {
-  const requests = useOpenRequests();
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
+  const rawRequests = useOpenRequests();
   const hydrated = useOpenRequestsHydrated();
+  const { coordinate: myCoordinate } = useDeviceLocation();
+
+  // Closest first — requests with a dropped pin sort by real distance; the rest
+  // (no pin, so no distance to compare) stay in their existing newest-first order,
+  // after the ones we can actually measure.
+  const requests = [...rawRequests].sort((a, b) => {
+    const coordA = coordinateFor(a);
+    const coordB = coordinateFor(b);
+    if (coordA && coordB) return distanceKm(myCoordinate, coordA) - distanceKm(myCoordinate, coordB);
+    if (coordA) return -1;
+    if (coordB) return 1;
+    return 0;
+  });
 
   if (!hydrated) {
     return <ActivityIndicator color={Colors.muted} style={styles.browseLoading} />;
@@ -109,7 +138,38 @@ function BrowsePanel() {
   );
 }
 
+/** InDrive nudges drivers toward high-demand areas; the equivalent here is showing a seller
+ * which categories have the most open requests right now, from data already on the phone. */
+function DemandBanner() {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
+  const requests = useOpenRequests();
+  const topCategories = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const r of requests) {
+      if (r.categoryId === '' || r.categoryId === 'any') continue;
+      counts.set(r.categoryId, (counts.get(r.categoryId) ?? 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
+  }, [requests]);
+
+  if (topCategories.length === 0) return null;
+
+  return (
+    <View style={styles.demandBanner}>
+      <Text style={styles.demandTitle}>In demand right now</Text>
+      {topCategories.map(([categoryId, count]) => (
+        <Text key={categoryId} style={styles.demandText}>
+          {count} {count === 1 ? 'person is' : 'people are'} looking for {categoryLabel(categoryId)}
+        </Text>
+      ))}
+    </View>
+  );
+}
+
 function SellOption({ title, detail, onPress }: { title: string; detail: string; onPress: () => void }) {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   return (
     <Pressable style={({ pressed }) => [styles.sellRow, pressed && styles.pressed]} onPress={onPress}>
       <View style={styles.sellText}>
@@ -122,6 +182,7 @@ function SellOption({ title, detail, onPress }: { title: string; detail: string;
 }
 
 function SellPanel() {
+  const Colors = useColors();
   const router = useRouter();
   const supplier = useSupplier();
   const supplierStatus = supplier?.status;
@@ -130,6 +191,7 @@ function SellPanel() {
 
   return (
     <View>
+      <DemandBanner />
       <SellOption
         title="Local stock"
         detail="Parts you have in Zimbabwe. Buyers collect, or you deliver."
@@ -178,8 +240,10 @@ function SellPanel() {
 }
 
 export default function PostScreen() {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   const router = useRouter();
-  const params = useLocalSearchParams<{ view?: string }>();
+  const params = useLocalSearchParams<{ view?: string; partName?: string }>();
   const [mode, setMode] = useState<Mode>('new');
   const [partName, setPartName] = useState('');
   const [vehicle, setVehicle] = useState('');
@@ -192,12 +256,32 @@ export default function PostScreen() {
   const [source, setSource] = useState<RequestSource>('Any');
   const [categoryId, setCategoryId] = useState('any');
   const [refreshing, setRefreshing] = useState(false);
+  const [priceGuidance, setPriceGuidance] = useState<PriceGuidance | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       refreshAll();
     }, []),
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchCategoryPriceGuidance(categoryId).then((guidance) => {
+      if (!cancelled) setPriceGuidance(guidance);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [categoryId]);
+
+  useEffect(() => {
+    if (params.partName) {
+      // "Post this again" from Deal History — a one-shot prefill, same pattern as `view` below.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPartName(params.partName);
+      router.setParams({ partName: undefined });
+    }
+  }, [params.partName, router]);
 
   useEffect(() => {
     if (params.view === 'sell' || params.view === 'browse') {
@@ -320,6 +404,11 @@ export default function PostScreen() {
                   value={budget}
                   onChangeText={setBudget}
                 />
+                {priceGuidance && (
+                  <Text style={styles.priceGuidance}>
+                    Similar parts closed at ${priceGuidance.minPrice}–${priceGuidance.maxPrice} recently (avg ${priceGuidance.avgPrice})
+                  </Text>
+                )}
               </View>
 
               <View style={styles.field}>
@@ -353,7 +442,8 @@ export default function PostScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(Colors: ColorPalette) {
+  return StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -392,6 +482,31 @@ const styles = StyleSheet.create({
     minHeight: 64,
     textAlignVertical: 'top',
   },
+  priceGuidance: {
+    fontFamily: Fonts.bodyRegular,
+    fontSize: Type.caption,
+    color: Colors.muted,
+  },
+  demandBanner: {
+    backgroundColor: Colors.header,
+    borderRadius: Radii.md,
+    padding: Spacing.lg,
+    gap: 4,
+    marginBottom: Spacing.lg,
+  },
+  demandTitle: {
+    fontFamily: Fonts.bodyBold,
+    fontSize: Type.caption,
+    color: Colors.accent,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginBottom: 2,
+  },
+  demandText: {
+    fontFamily: Fonts.bodyMedium,
+    fontSize: Type.small,
+    color: '#FFFFFF',
+  },
   sellRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -416,7 +531,7 @@ const styles = StyleSheet.create({
   sellArrow: {
     fontFamily: Fonts.bodyBold,
     fontSize: Type.body,
-    color: Colors.header,
+    color: Colors.ink,
   },
   browseLoading: {
     marginTop: Spacing.xxxl,
@@ -435,7 +550,7 @@ const styles = StyleSheet.create({
   offersRowText: {
     fontFamily: Fonts.bodyBold,
     fontSize: Type.small,
-    color: Colors.header,
+    color: Colors.ink,
   },
   cardGap: {
     marginVertical: Spacing.xl,
@@ -487,3 +602,4 @@ const styles = StyleSheet.create({
     color: Colors.muted,
   },
 });
+}

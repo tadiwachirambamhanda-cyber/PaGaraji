@@ -1,40 +1,39 @@
 import { Redirect, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useState, useMemo } from 'react';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { CategoryTabs } from '@/components/category-tabs';
 import { applyFilters, EMPTY_FILTERS, FilterSheet, isFiltersActive, type Filters } from '@/components/filter-sheet';
 import { BellIcon, ChevronDownIcon, LocationIcon, PlusIcon } from '@/components/icons';
+import { HazardStripe } from '@/components/hazard-stripe';
 import { HomeMap } from '@/components/home-map';
-import { InlineToggle } from '@/components/inline-toggle';
 import { ListingCard } from '@/components/listing-card';
 import { LocationSheet } from '@/components/location-sheet';
 import { Logo } from '@/components/logo';
 import { PageHeader } from '@/components/page-header';
 import { SearchBar } from '@/components/search-bar';
 import { SORT_SHORT, SortSheet, type SortKey } from '@/components/sort-sheet';
-import { Stitch } from '@/components/stitch';
 import { ToggleChip } from '@/components/toggle-chip';
 import { categories } from '@/data/categories';
 import { tapLight } from '@/lib/haptics';
 import { refreshAll } from '@/lib/refresh';
+import { useRemoteListingsHydrated } from '@/store/remote-listings';
 import { useAllListings } from '@/store/my-listings';
 import { useOpenRequests } from '@/store/open-requests';
-import { saveProfile, useProfile } from '@/store/profile';
+import { initialsOf, saveProfile, useProfile } from '@/store/profile';
 import { addRecentSearch, clearRecentSearches, useRecentSearches } from '@/store/recent-searches';
 import { useSettings, useSettingsHydrated } from '@/store/settings';
+import { openSidebar } from '@/store/sidebar';
 import { useVehicle } from '@/store/vehicle';
-import { Colors, Fonts, Radii, Spacing, Type } from '@/theme';
-
-const SOURCES = ['All', 'Local', 'Import'] as const;
-type Source = (typeof SOURCES)[number];
+import { Fonts, Radii, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
 export default function HomeScreen() {
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   const router = useRouter();
   const params = useLocalSearchParams<{ category?: string }>();
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [search, setSearch] = useState('');
-  const [source, setSource] = useState<Source>('All');
   const [sort, setSort] = useState<SortKey>('newest');
   const [sortVisible, setSortVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -49,6 +48,7 @@ export default function HomeScreen() {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [draftFilters, setDraftFilters] = useState<Filters>(EMPTY_FILTERS);
   const listings = useAllListings();
+  const listingsHydrated = useRemoteListingsHydrated();
   const openRequests = useOpenRequests();
 
   useEffect(() => {
@@ -81,9 +81,7 @@ export default function HomeScreen() {
     const matchesCategory = selectedCategory === 'all' || item.categoryId === selectedCategory;
     const matchesQuery =
       query === '' || item.title.toLowerCase().includes(query) || item.fitment.toLowerCase().includes(query);
-    const matchesSource =
-      source === 'All' || (source === 'Local' ? item.origin === 'Local' : item.origin !== 'Local');
-    return matchesCategory && matchesQuery && matchesSource;
+    return matchesCategory && matchesQuery;
   });
   const filtered = applyFilters(categoryAndSearchFiltered, filters, vehicle);
   const sorted =
@@ -132,6 +130,11 @@ export default function HomeScreen() {
                       onPress={() => router.push('/(tabs)/activity?mode=matches')}>
                       <BellIcon size={22} color={Colors.ink} />
                     </Pressable>
+                    <Pressable accessibilityLabel="Menu" hitSlop={8} onPress={() => { tapLight(); openSidebar(); }}>
+                      <View style={styles.menuAvatar}>
+                        <Text style={styles.menuAvatarText}>{initialsOf(profile.name)}</Text>
+                      </View>
+                    </Pressable>
                   </View>
                 </View>
               }>
@@ -172,8 +175,9 @@ export default function HomeScreen() {
               </View>
             )}
 
+            <HazardStripe />
             <View style={styles.mapSection}>
-              <HomeMap listings={sorted} requests={openRequests} height={240} />
+              <HomeMap listings={sorted} requests={openRequests} height={340} />
             </View>
 
             <View style={styles.tabs}>
@@ -181,7 +185,6 @@ export default function HomeScreen() {
             </View>
 
             <View style={styles.controls}>
-              <InlineToggle options={SOURCES} value={source} onChange={setSource} />
               <Pressable hitSlop={8} onPress={() => setSortVisible(true)}>
                 <Text style={styles.link}>
                   {sorted.length} {sorted.length === 1 ? 'part' : 'parts'} · {SORT_SHORT[sort]}
@@ -191,27 +194,16 @@ export default function HomeScreen() {
           </>
         }
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>Nothing here yet</Text>
-            <Text style={styles.emptyText}>Try another category or fewer filters. Or tell sellers what you need.</Text>
-            <Pressable hitSlop={8} onPress={() => router.push('/post')}>
-              <Text style={styles.link}>Request a part</Text>
-            </Pressable>
-          </View>
-        }
-        ListFooterComponent={
-          <View style={styles.sellPrompt}>
-            <Stitch />
-            <Pressable
-              style={({ pressed }) => [styles.sellRow, pressed && styles.pressed]}
-              onPress={() => router.push('/post?view=sell')}>
-              <View style={styles.sellText}>
-                <Text style={styles.sellTitle}>Got parts to sell?</Text>
-                <Text style={styles.sellDetail}>List them here, from your shelf or from overseas.</Text>
-              </View>
-              <Text style={styles.sellArrow}>→</Text>
-            </Pressable>
-          </View>
+          listingsHydrated ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>Nothing here yet</Text>
+              <Text style={styles.emptyText}>Try another category or fewer filters.</Text>
+            </View>
+          ) : (
+            <View style={styles.emptyState}>
+              <ActivityIndicator color={Colors.muted} />
+            </View>
+          )
         }
         renderItem={({ item }) => <ListingCard listing={item} half />}
       />
@@ -261,7 +253,8 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(Colors: ColorPalette) {
+  return StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -287,7 +280,21 @@ const styles = StyleSheet.create({
   locationText: {
     fontFamily: Fonts.bodyBold,
     fontSize: Type.small,
-    color: Colors.header,
+    color: Colors.ink,
+  },
+  menuAvatar: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    backgroundColor: Colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ rotate: '-4deg' }],
+  },
+  menuAvatarText: {
+    fontFamily: Fonts.headingBold,
+    fontSize: Type.caption,
+    color: Colors.tagInk,
   },
   search: {
     marginTop: Spacing.md,
@@ -315,7 +322,7 @@ const styles = StyleSheet.create({
   controls: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     paddingHorizontal: Spacing.xl,
     paddingTop: Spacing.md,
     paddingBottom: Spacing.md,
@@ -323,45 +330,13 @@ const styles = StyleSheet.create({
   link: {
     fontFamily: Fonts.bodyBold,
     fontSize: Type.small,
-    color: Colors.header,
+    color: Colors.ink,
     textDecorationLine: 'underline',
   },
   gridRow: {
     gap: Spacing.lg,
     paddingHorizontal: Spacing.xl,
     marginBottom: Spacing.xl,
-  },
-  pressed: {
-    opacity: 0.6,
-  },
-  sellPrompt: {
-    marginHorizontal: Spacing.xl,
-    marginTop: Spacing.sm,
-  },
-  sellRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    paddingVertical: Spacing.lg,
-  },
-  sellText: {
-    flex: 1,
-    gap: 2,
-  },
-  sellTitle: {
-    fontFamily: Fonts.headingBold,
-    fontSize: Type.title,
-    color: Colors.ink,
-  },
-  sellDetail: {
-    fontFamily: Fonts.bodyRegular,
-    fontSize: Type.small,
-    color: Colors.muted,
-  },
-  sellArrow: {
-    fontFamily: Fonts.bodyBold,
-    fontSize: Type.body,
-    color: Colors.header,
   },
   emptyState: {
     paddingHorizontal: Spacing.xl,
@@ -399,3 +374,4 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
 });
+}

@@ -2,18 +2,51 @@
  * Workshop — the brand theme for the app (replaced Market Bright, 2026-09-23).
  * Charcoal + safety orange + warm paper. Barlow for headings and body, Archivo
  * Black reserved for the wordmark only — one loud face, used once, not everywhere.
+ *
+ * Dark mode (added 2026-09-23): `header`, `accent`/`primary`, `accentInk`/`tagInk`
+ * and `whatsapp` are deliberately IDENTICAL in both palettes below — every one of
+ * them is only ever used as a filled background (button, avatar, pill, tag) paired
+ * with its own contrasting foreground, never as text sitting directly on the
+ * screen background, so there's nothing to invert. Everything else (surfaces,
+ * text, borders, status colors) does flip. See `useColors()`.
  */
 
-export const Colors = {
+import { useSettings } from '@/store/settings';
+
+export type ColorPalette = Record<
+  | 'background'
+  | 'card'
+  | 'cardImage'
+  | 'header'
+  | 'accent'
+  | 'accentInk'
+  | 'primary'
+  | 'ink'
+  | 'muted'
+  | 'placeholder'
+  | 'navMuted'
+  | 'border'
+  | 'line'
+  | 'importInk'
+  | 'tagInk'
+  | 'success'
+  | 'danger'
+  | 'whatsapp',
+  string
+>;
+
+const LightColors: ColorPalette = {
   background: '#F2ECDF',
   card: '#FFFFFF',
   cardImage: '#E9E0C9',
-  // The dominant UI color: primary buttons, active states, links. Charcoal, not a
-  // hue — Workshop reads as bold hardware, not a colorful marketplace.
+  // The dominant fill color: primary buttons, active states, avatar/pill backgrounds.
+  // Charcoal, not a hue — Workshop reads as bold hardware, not a colorful marketplace.
+  // Always paired with its own light/accent foreground, so it doesn't need a dark variant.
   header: '#211D18',
   // The one accent. Used for both `accent` (tags, the wordmark's "Pa") and
   // `primary` (CTA emphasis, unread badges) on purpose — a single strong color,
-  // not several competing ones.
+  // not several competing ones. Vibrant enough to read on both a light paper and
+  // a dark charcoal background, so it doesn't need a dark variant either.
   accent: '#FF6A00',
   accentInk: '#211D18',
   primary: '#FF6A00',
@@ -32,7 +65,40 @@ export const Colors = {
   success: '#3E7D4A',
   danger: '#B23A2E',
   whatsapp: '#25D366',
-} as const;
+};
+
+const DarkColors: ColorPalette = {
+  background: '#17140F',
+  card: '#241F18',
+  cardImage: '#2C2620',
+  header: '#211D18',
+  accent: '#FF6A00',
+  accentInk: '#211D18',
+  primary: '#FF6A00',
+  // Paper, inverted: the same warm off-white the light theme uses as its background.
+  ink: '#F2ECDF',
+  muted: '#B3A890',
+  placeholder: '#6B6255',
+  navMuted: '#7A705F',
+  border: '#3A3327',
+  line: '#4A4133',
+  importInk: '#E0A15C',
+  tagInk: '#211D18',
+  success: '#5FA86C',
+  danger: '#E0685A',
+  whatsapp: '#25D366',
+};
+
+// A static fallback for anything read outside a component (rare) — always light.
+// Every screen/component should use `useColors()` instead so it actually reacts
+// to the theme setting.
+export const Colors = LightColors;
+
+/** The live color palette for the current theme setting — reactive, re-renders on toggle. */
+export function useColors(): ColorPalette {
+  const { themeMode } = useSettings();
+  return themeMode === 'dark' ? DarkColors : LightColors;
+}
 
 export const Fonts = {
   // Reserved for the wordmark alone — see components/logo.tsx.
@@ -75,7 +141,10 @@ export const Radii = {
 } as const;
 
 // Tinted with the brand ink rather than pure black, so elevation stays warm
-// instead of looking like a generic default shadow.
+// instead of looking like a generic default shadow. Same in both themes — a
+// black-tinted shadow reads fine on a dark surface too, just less visible,
+// which is the correct behavior (elevation matters less once the backdrop
+// itself is already dark).
 export const Shadows = {
   sm: {
     shadowColor: '#1A1A1A',

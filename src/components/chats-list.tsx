@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { Stitch } from '@/components/stitch';
@@ -11,10 +11,12 @@ import {
   useConversationsHydrated,
   type ConversationSummary,
 } from '@/store/conversations';
-import { Colors, Fonts, Spacing, Type } from '@/theme';
+import { Fonts, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
 function ConversationRow({ item }: { item: ConversationSummary }) {
   const router = useRouter();
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
   const unread = item.unreadCount > 0;
 
   return (
@@ -50,6 +52,8 @@ export function ChatsList() {
   const conversations = useConversations();
   const hydrated = useConversationsHydrated();
   const [refreshing, setRefreshing] = useState(false);
+  const Colors = useColors();
+  const styles = useMemo(() => createStyles(Colors), [Colors]);
 
   return (
     <FlatList
@@ -89,7 +93,8 @@ export function ChatsList() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(Colors: ColorPalette) {
+  return StyleSheet.create({
   list: {
     flexGrow: 1,
     paddingBottom: Spacing.xxxl,
@@ -148,7 +153,7 @@ const styles = StyleSheet.create({
   listingTitle: {
     fontFamily: Fonts.bodyMedium,
     fontSize: Type.caption,
-    color: Colors.header,
+    color: Colors.ink,
   },
   lastMessage: {
     fontFamily: Fonts.bodyRegular,
@@ -184,4 +189,5 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     color: Colors.muted,
   },
-});
+  });
+}
