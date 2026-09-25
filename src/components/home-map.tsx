@@ -16,7 +16,10 @@ import { Fonts, Radii, Spacing, Type, useColors, type ColorPalette } from '@/the
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const Maps = Platform.OS === 'web' ? null : (require('react-native-maps') as typeof import('react-native-maps'));
 
-const MAP_FILTERS = ['Local', 'Import', 'Requests'] as const;
+// "All" plots every local seller, every import/Dubai-China seller, and every open request
+// together — the actual "everything nearby" view. The other three narrow it down to just one
+// kind, for whenever that's genuinely what someone's looking for.
+const MAP_FILTERS = ['All', 'Local', 'Import', 'Requests'] as const;
 type MapFilter = (typeof MAP_FILTERS)[number];
 
 type HomeMapProps = {
@@ -33,21 +36,32 @@ export function HomeMap({ listings, requests = [], height }: HomeMapProps) {
   const router = useRouter();
   const { coordinate } = useDeviceLocation();
   const mapRef = useRef<import('react-native-maps').default>(null);
-  const [filter, setFilter] = useState<MapFilter>('Local');
+  const [filter, setFilter] = useState<MapFilter>('All');
   const [filterSheetVisible, setFilterSheetVisible] = useState(false);
 
-  const listingPins = useMemo(
-    () =>
-      listings
-        .filter((listing) => (filter === 'Local' ? listing.origin === 'Local' : filter === 'Import' ? listing.origin !== 'Local' : false))
-        .slice(0, 60)
-        .map((listing) => ({ listing, coordinate: coordinateFor(listing) }))
-        .filter((pin): pin is { listing: Listing; coordinate: NonNullable<typeof pin.coordinate> } => pin.coordinate !== null),
-    [listings, filter],
-  );
+  const listingPins = useMemo(() => {
+    let candidates: Listing[];
+    if (filter === 'Requests') {
+      candidates = [];
+    } else if (filter === 'Local') {
+      candidates = listings.filter((listing) => listing.origin === 'Local').slice(0, 60);
+    } else if (filter === 'Import') {
+      candidates = listings.filter((listing) => listing.origin !== 'Local').slice(0, 60);
+    } else {
+      // 'All': split the pin budget evenly across origins rather than one shared slice — otherwise
+      // whichever origin happens to sort first in `listings` could crowd the other off the map
+      // entirely, defeating the point of an "everything nearby" view.
+      const local = listings.filter((listing) => listing.origin === 'Local').slice(0, 30);
+      const imported = listings.filter((listing) => listing.origin !== 'Local').slice(0, 30);
+      candidates = [...local, ...imported];
+    }
+    return candidates
+      .map((listing) => ({ listing, coordinate: coordinateFor(listing) }))
+      .filter((pin): pin is { listing: Listing; coordinate: NonNullable<typeof pin.coordinate> } => pin.coordinate !== null);
+  }, [listings, filter]);
   const requestPins = useMemo(
     () =>
-      (filter === 'Requests' ? requests : [])
+      (filter === 'All' || filter === 'Requests' ? requests : [])
         .slice(0, 40)
         .map((request) => ({ request, coordinate: coordinateFor(request) }))
         .filter((pin): pin is { request: PartRequest; coordinate: NonNullable<typeof pin.coordinate> } => pin.coordinate !== null),

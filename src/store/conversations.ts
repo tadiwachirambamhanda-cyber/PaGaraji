@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 
+import { createTableActivitySubscriber } from '@/lib/realtime-activity';
 import { supabase } from '@/lib/supabase';
 
 export type ConversationSummary = {
@@ -87,27 +88,13 @@ export async function refreshConversations(): Promise<void> {
 }
 
 // Keeps the Chats list and the tab-bar badge live everywhere in the app. RLS on `messages`
-// means this only ever delivers events from conversations you're actually part of — but only
-// once Realtime's websocket actually knows who you are, which isn't true yet at module load
-// (the saved session is still being read from storage). Subscribing has to wait for a real,
-// signed-in auth event, or it silently connects as nobody and never receives anything.
-let activityChannel: ReturnType<NonNullable<typeof supabase>['channel']> | null = null;
-
-function subscribeToActivity() {
-  if (!supabase || activityChannel) return;
-  activityChannel = supabase
-    .channel('conversations-activity')
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
-      refreshConversations();
-    })
-    .subscribe();
-}
-
-function unsubscribeFromActivity() {
-  if (!supabase || !activityChannel) return;
-  supabase.removeChannel(activityChannel);
-  activityChannel = null;
-}
+// means this only ever delivers events from conversations you're actually part of.
+const { subscribe: subscribeToActivity, unsubscribe: unsubscribeFromActivity } = createTableActivitySubscriber(
+  'conversations-activity',
+  'messages',
+  'INSERT',
+  refreshConversations,
+);
 
 if (supabase) {
   refreshConversations();

@@ -6,13 +6,18 @@ import { ChatIcon, HomeIcon } from '@/components/icons';
 import { useNotifications } from '@/lib/notifications';
 import { refreshAll } from '@/lib/refresh';
 import { useUnreadCount } from '@/store/conversations';
+import { useMyRequests } from '@/store/my-requests';
 import { Fonts, Type, useColors } from '@/theme';
 
 export default function TabsLayout() {
   const Colors = useColors();
   const unread = useUnreadCount();
   const matches = useNotifications().length;
-  const activityBadge = unread + matches;
+  // Pending offers on your own requests — piggybacks on the same live request_offers
+  // subscription that already keeps Requests-list counts current (store/remote-requests.ts),
+  // so this reflects a new bid the moment it lands, not just when Requests itself is open.
+  const pendingOffers = useMyRequests().reduce((sum, r) => sum + (r.pendingOfferCount ?? 0), 0);
+  const activityBadge = unread + matches + pendingOffers;
 
   const screenOptions = useMemo(
     () => ({

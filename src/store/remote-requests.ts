@@ -1,5 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 
+import { createTableActivitySubscriber } from '@/lib/realtime-activity';
 import { supabase } from '@/lib/supabase';
 import { useAuthReady } from '@/store/auth';
 import type { PartRequest, RequestSource, RequestStatus } from '@/store/my-requests';
@@ -97,11 +98,24 @@ export async function refreshRemoteRequests(): Promise<void> {
   emitChange();
 }
 
+// Keeps each request's pendingOfferCount (the "3 offers waiting" badge on Activity's Requests
+// list) live, the same way `conversations.ts`'s activity channel keeps the Chats list live —
+// any change to any offer anywhere just re-runs the one query that already recomputes every
+// count in one go, rather than trying to track which specific request a given offer affects.
+const { subscribe: subscribeToOffersActivity, unsubscribe: unsubscribeFromOffersActivity } = createTableActivitySubscriber(
+  'request-offers-activity',
+  'request_offers',
+  '*',
+  refreshRemoteRequests,
+);
+
 if (supabase) {
   refreshRemoteRequests();
   // Deferred: Supabase asks that its own calls are not made inside this callback.
-  supabase.auth.onAuthStateChange((event) => {
+  supabase.auth.onAuthStateChange((event, session) => {
     if (event !== 'TOKEN_REFRESHED') setTimeout(refreshRemoteRequests, 0);
+    if (session) subscribeToOffersActivity();
+    else unsubscribeFromOffersActivity();
   });
 }
 
