@@ -1,11 +1,12 @@
 import { useRouter } from 'expo-router';
-import { useEffect, useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Stamp } from '@/components/stamp';
-import { fetchMyOffers, type SellerOffer } from '@/lib/offers';
+import { type SellerOffer } from '@/lib/offers';
 import { refreshAll } from '@/lib/refresh';
 import { timeAgo } from '@/lib/time';
+import { useMyOffers, useMyOffersHydrated } from '@/store/my-offers';
 import { Fonts, Spacing, Type, useColors, type ColorPalette } from '@/theme';
 
 function statusColor(status: SellerOffer['status'], Colors: ColorPalette) {
@@ -50,21 +51,17 @@ export function MyOffersList() {
   const Colors = useColors();
   const styles = useMemo(() => createStyles(Colors), [Colors]);
   const router = useRouter();
-  const [offers, setOffers] = useState<SellerOffer[] | null>(null);
+  const offers = useMyOffers();
+  const hydrated = useMyOffersHydrated();
   const [refreshing, setRefreshing] = useState(false);
-
-  useEffect(() => {
-    fetchMyOffers().then(setOffers);
-  }, []);
 
   const refresh = async () => {
     setRefreshing(true);
     await refreshAll();
-    setOffers(await fetchMyOffers());
     setRefreshing(false);
   };
 
-  if (offers === null) {
+  if (!hydrated) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator color={Colors.muted} />

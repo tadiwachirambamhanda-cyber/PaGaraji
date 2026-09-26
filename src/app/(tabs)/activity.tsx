@@ -14,6 +14,7 @@ import { refreshAll } from '@/lib/refresh';
 import { useNotifications } from '@/lib/notifications';
 import { useUnreadCount } from '@/store/conversations';
 import { markDealsSeen, useNewDealsCount } from '@/store/deal-history';
+import { useCounteredOffersCount } from '@/store/my-offers';
 import { useMyRequests } from '@/store/my-requests';
 import { initialsOf, useProfile } from '@/store/profile';
 import { openSidebar } from '@/store/sidebar';
@@ -38,6 +39,7 @@ export default function ActivityScreen() {
   const openRequests = useMyRequests().filter((r) => r.status === 'Open').length;
   const matchCount = useNotifications().length;
   const newDeals = useNewDealsCount();
+  const counteredOffers = useCounteredOffersCount();
   const profile = useProfile();
 
   useFocusEffect(
@@ -67,9 +69,13 @@ export default function ActivityScreen() {
     if (mode === 'deals') markDealsSeen();
   }, [mode]);
 
-  // Selling has no badge count of its own yet — same starting point Deals had before a badge
-  // was specifically asked for.
-  const counts: Record<Mode, number> = { chats: unread, requests: openRequests, matches: matchCount, deals: newDeals, selling: 0 };
+  const counts: Record<Mode, number> = {
+    chats: unread,
+    requests: openRequests,
+    matches: matchCount,
+    deals: newDeals,
+    selling: counteredOffers,
+  };
   const subtitle =
     mode === 'chats'
       ? unread > 0
@@ -85,7 +91,9 @@ export default function ActivityScreen() {
             ? newDeals > 0
               ? `${newDeals} new`
               : undefined
-            : undefined;
+            : counteredOffers > 0
+              ? `${counteredOffers} need${counteredOffers === 1 ? 's' : ''} a response`
+              : undefined;
 
   return (
     <View style={styles.screen}>

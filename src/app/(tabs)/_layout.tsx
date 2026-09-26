@@ -6,6 +6,7 @@ import { ChatIcon, HomeIcon } from '@/components/icons';
 import { useNotifications } from '@/lib/notifications';
 import { refreshAll } from '@/lib/refresh';
 import { useUnreadCount } from '@/store/conversations';
+import { useCounteredOffersCount } from '@/store/my-offers';
 import { useMyRequests } from '@/store/my-requests';
 import { Fonts, Type, useColors } from '@/theme';
 
@@ -17,7 +18,10 @@ export default function TabsLayout() {
   // subscription that already keeps Requests-list counts current (store/remote-requests.ts),
   // so this reflects a new bid the moment it lands, not just when Requests itself is open.
   const pendingOffers = useMyRequests().reduce((sum, r) => sum + (r.pendingOfferCount ?? 0), 0);
-  const activityBadge = unread + matches + pendingOffers;
+  // Offers where a buyer countered you — the seller-side mirror of pendingOffers, same live
+  // wiring via store/my-offers.ts's own request_offers channel.
+  const counteredOffers = useCounteredOffersCount();
+  const activityBadge = unread + matches + pendingOffers + counteredOffers;
 
   const screenOptions = useMemo(
     () => ({
