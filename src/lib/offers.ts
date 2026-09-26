@@ -379,3 +379,55 @@ export async function fetchMyDeals(): Promise<Deal[]> {
   }
   return deals;
 }
+
+export type SellerOffer = {
+  id: string;
+  requestId: string;
+  partName: string;
+  price: number;
+  message: string;
+  status: OfferStatus;
+  counterPrice?: number;
+  createdAt: number;
+  /** The request's own current status — lets "Bought elsewhere" (Matched, someone else's offer
+   * won) read differently from "Still open" even for a pending offer of yours. */
+  requestStatus: 'Open' | 'Matched' | 'Closed';
+  buyerName: string;
+};
+
+type MyOfferRow = {
+  id: string;
+  request_id: string;
+  price: number | string;
+  message: string;
+  status: OfferStatus;
+  counter_price: number | string | null;
+  created_at: string;
+  part_name: string;
+  request_status: 'Open' | 'Matched' | 'Closed';
+  buyer_name: string | null;
+};
+
+/**
+ * Every offer you've placed as a seller, across every request, newest first — regardless of
+ * how it turned out. Goes through the `my_offers` RPC rather than a plain select-then-join
+ * because the request info here (part name, its own status) isn't always readable through
+ * `requests`'s own RLS once someone else's offer has won it; see the migration for why.
+ */
+export async function fetchMyOffers(): Promise<SellerOffer[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc('my_offers');
+  if (error || !data) return [];
+  return (data as MyOfferRow[]).map((row) => ({
+    id: row.id,
+    requestId: row.request_id,
+    partName: row.part_name,
+    price: Number(row.price),
+    message: row.message,
+    status: row.status,
+    counterPrice: row.counter_price !== null ? Number(row.counter_price) : undefined,
+    createdAt: Date.parse(row.created_at),
+    requestStatus: row.request_status,
+    buyerName: row.buyer_name || 'PaGaraji user',
+  }));
+}

@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { CategoryTabs } from '@/components/category-tabs';
 import { ChatsList } from '@/components/chats-list';
 import { DealHistoryList } from '@/components/deal-history-list';
+import { MyOffersList } from '@/components/my-offers-list';
 import { MyRequestsList } from '@/components/my-requests-list';
 import { NotificationsList } from '@/components/notifications-list';
 import { PageHeader } from '@/components/page-header';
@@ -23,6 +24,7 @@ const MODES = [
   { id: 'requests', label: 'Requests' },
   { id: 'matches', label: 'Matches' },
   { id: 'deals', label: 'Deals' },
+  { id: 'selling', label: 'Selling' },
 ] as const;
 type Mode = (typeof MODES)[number]['id'];
 
@@ -45,7 +47,13 @@ export default function ActivityScreen() {
   );
 
   useEffect(() => {
-    if (params.mode === 'chats' || params.mode === 'requests' || params.mode === 'matches' || params.mode === 'deals') {
+    if (
+      params.mode === 'chats' ||
+      params.mode === 'requests' ||
+      params.mode === 'matches' ||
+      params.mode === 'deals' ||
+      params.mode === 'selling'
+    ) {
       // Route params are external state; this mirrors a one-shot navigation hint into local state.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setMode(params.mode);
@@ -59,7 +67,9 @@ export default function ActivityScreen() {
     if (mode === 'deals') markDealsSeen();
   }, [mode]);
 
-  const counts: Record<Mode, number> = { chats: unread, requests: openRequests, matches: matchCount, deals: newDeals };
+  // Selling has no badge count of its own yet — same starting point Deals had before a badge
+  // was specifically asked for.
+  const counts: Record<Mode, number> = { chats: unread, requests: openRequests, matches: matchCount, deals: newDeals, selling: 0 };
   const subtitle =
     mode === 'chats'
       ? unread > 0
@@ -71,8 +81,10 @@ export default function ActivityScreen() {
           ? matchCount > 0
             ? `${matchCount} new`
             : undefined
-          : newDeals > 0
-            ? `${newDeals} new`
+          : mode === 'deals'
+            ? newDeals > 0
+              ? `${newDeals} new`
+              : undefined
             : undefined;
 
   return (
@@ -102,6 +114,7 @@ export default function ActivityScreen() {
         {mode === 'requests' && <MyRequestsList onPostNew={() => router.push('/post')} />}
         {mode === 'matches' && <NotificationsList onSelect={() => setMode('requests')} />}
         {mode === 'deals' && <DealHistoryList />}
+        {mode === 'selling' && <MyOffersList />}
       </View>
     </View>
   );
