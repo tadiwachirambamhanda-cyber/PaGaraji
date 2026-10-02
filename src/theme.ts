@@ -1,7 +1,8 @@
 /**
  * Workshop — the brand theme for the app (replaced Market Bright, 2026-09-23).
- * Charcoal + safety orange + warm paper. Barlow for headings and body, Archivo
- * Black reserved for the wordmark only — one loud face, used once, not everywhere.
+ * Charcoal + safety orange + warm paper. Big Shoulders for headings, Barlow for
+ * body, Archivo Black reserved for the wordmark only — one loud face, used once,
+ * not everywhere.
  *
  * Dark mode (added 2026-09-23, fill-vs-background contrast fixed same day):
  * `accent`/`primary`, `accentInk`/`tagInk` and `whatsapp` are deliberately
@@ -115,15 +116,16 @@ export function useColors(): ColorPalette {
 export const Fonts = {
   // Reserved for the wordmark alone — see components/logo.tsx.
   display: 'ArchivoBlack_400Regular',
-  // Headings/emphasis: Space Grotesk (2026-09-23, replaced Barlow here) — same
-  // clean, utilitarian bones as Barlow but with a bit more technical character,
-  // a step toward the wordmark's Archivo Black without going that loud
-  // everywhere. Tops out at 700 (no 800 weight exists), so `headingSemiBold`
-  // and `headingBold` share the same weight — differentiated by size/context
-  // instead, same as before.
-  headingMedium: 'SpaceGrotesk_600SemiBold',
-  headingSemiBold: 'SpaceGrotesk_700Bold',
-  headingBold: 'SpaceGrotesk_700Bold',
+  // Headings/emphasis: Big Shoulders (2026-09-26, replaced Space Grotesk here) —
+  // a genuinely industrial condensed face (its letterforms trace back to Chicago
+  // ironwork/skyline lettering), fitting the Workshop garage/toolbox concept far
+  // more literally than Space Grotesk's generic-tech-startup geometric sans, and
+  // far less oversaturated. Tops out at 700 (no 800 weight in this family), so
+  // `headingSemiBold` and `headingBold` share the same weight — differentiated
+  // by size/context instead, same as before.
+  headingMedium: 'BigShoulders_600SemiBold',
+  headingSemiBold: 'BigShoulders_700Bold',
+  headingBold: 'BigShoulders_700Bold',
   // Body text stays Barlow — reads well at small sizes, and keeps one font
   // doing headings/emphasis and a different one carrying paragraph-length text,
   // rather than one face for everything.

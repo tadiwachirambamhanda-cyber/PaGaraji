@@ -3,7 +3,7 @@ import '@/lib/refresh';
 
 import { ArchivoBlack_400Regular } from '@expo-google-fonts/archivo-black';
 import { Barlow_400Regular, Barlow_500Medium, Barlow_700Bold } from '@expo-google-fonts/barlow';
-import { SpaceGrotesk_600SemiBold, SpaceGrotesk_700Bold } from '@expo-google-fonts/space-grotesk';
+import { BigShoulders_600SemiBold, BigShoulders_700Bold } from '@expo-google-fonts/big-shoulders';
 import { useFonts } from 'expo-font';
 import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -25,8 +25,8 @@ export default function RootLayout() {
     Barlow_400Regular,
     Barlow_500Medium,
     Barlow_700Bold,
-    SpaceGrotesk_600SemiBold,
-    SpaceGrotesk_700Bold,
+    BigShoulders_600SemiBold,
+    BigShoulders_700Bold,
   });
 
   useEffect(() => {
