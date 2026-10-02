@@ -20,12 +20,14 @@ import { LocationPickerMap } from '@/components/location-picker-map';
 import { PhotoPicker } from '@/components/photo-picker';
 import { ScreenHeader } from '@/components/screen-header';
 import { SegmentedControl } from '@/components/segmented-control';
+import { Stamp } from '@/components/stamp';
 import { Stitch } from '@/components/stitch';
 import { categories } from '@/data/categories';
 import { coordinateFor } from '@/data/city-coordinates';
 import { distanceKm, formatDistance } from '@/lib/geo';
 import { success } from '@/lib/haptics';
 import { useDeviceLocation, type Coordinate } from '@/lib/location';
+import { useSellerDemandRequestIds } from '@/lib/notifications';
 import { fetchCategoryPriceGuidance, type PriceGuidance } from '@/lib/price-guidance';
 import { refreshAll } from '@/lib/refresh';
 import { createRequest } from '@/lib/request-actions';
@@ -53,7 +55,7 @@ function categoryLabel(id: string) {
   return CATEGORY_OPTIONS.find((c) => c.id === id)?.label ?? 'Any category';
 }
 
-function BrowseCard({ request }: { request: PartRequest }) {
+function BrowseCard({ request, matchesYourListings }: { request: PartRequest; matchesYourListings: boolean }) {
   const Colors = useColors();
   const styles = useMemo(() => createStyles(Colors), [Colors]);
   const router = useRouter();
@@ -63,6 +65,11 @@ function BrowseCard({ request }: { request: PartRequest }) {
 
   return (
     <Pressable style={({ pressed }) => [styles.card, pressed && styles.pressed]} onPress={() => router.push(`/request/${request.id}`)}>
+      {matchesYourListings && (
+        <View style={styles.matchStamp}>
+          <Stamp label="MATCHES WHAT YOU SELL" color={Colors.accent} />
+        </View>
+      )}
       <View style={styles.cardTop}>
         <Text style={styles.cardTitle} numberOfLines={2}>
           {request.partName}
@@ -98,11 +105,17 @@ function BrowsePanel() {
   const rawRequests = useOpenRequests();
   const hydrated = useOpenRequestsHydrated();
   const { coordinate: myCoordinate } = useDeviceLocation();
+  const demandRequestIds = useSellerDemandRequestIds();
 
-  // Closest first — requests with a dropped pin sort by real distance; the rest
-  // (no pin, so no distance to compare) stay in their existing newest-first order,
-  // after the ones we can actually measure.
+  // Closest first within each group — requests with a dropped pin sort by real distance, the
+  // rest (no pin, so no distance to compare) stay in their existing newest-first order after
+  // the ones we can actually measure. Requests matching your own listings float to the top of
+  // the whole list first, so the one signal built specifically for you isn't buried below
+  // whatever a stranger happens to be closest to.
   const requests = [...rawRequests].sort((a, b) => {
+    const aMatches = demandRequestIds.has(a.id);
+    const bMatches = demandRequestIds.has(b.id);
+    if (aMatches !== bMatches) return aMatches ? -1 : 1;
     const coordA = coordinateFor(a);
     const coordB = coordinateFor(b);
     if (coordA && coordB) return distanceKm(myCoordinate, coordA) - distanceKm(myCoordinate, coordB);
@@ -131,7 +144,7 @@ function BrowsePanel() {
               <Stitch />
             </View>
           )}
-          <BrowseCard request={request} />
+          <BrowseCard request={request} matchesYourListings={demandRequestIds.has(request.id)} />
         </View>
       ))}
     </View>
@@ -245,6 +258,7 @@ export default function PostScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ view?: string; partName?: string }>();
   const [mode, setMode] = useState<Mode>('new');
+  const demandCount = useSellerDemandRequestIds().size;
   const [partName, setPartName] = useState('');
   const [vehicle, setVehicle] = useState('');
   const [notes, setNotes] = useState('');
@@ -352,7 +366,11 @@ export default function PostScreen() {
           />
         }>
         <View style={styles.tabs}>
-          <CategoryTabs categories={MODES} value={mode} onChange={(id) => setMode(id as Mode)} />
+          <CategoryTabs
+            categories={MODES.map((m) => (m.id === 'browse' && demandCount > 0 ? { ...m, label: `${m.label} (${demandCount})` } : m))}
+            value={mode}
+            onChange={(id) => setMode(id as Mode)}
+          />
         </View>
 
         <View style={styles.form}>
@@ -559,6 +577,9 @@ function createStyles(Colors: ColorPalette) {
   },
   card: {
     gap: Spacing.sm,
+  },
+  matchStamp: {
+    alignSelf: 'flex-start',
   },
   cardTop: {
     flexDirection: 'row',
