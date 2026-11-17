@@ -1,56 +1,24 @@
-# Welcome to your Expo app 👋
+# PaGaraji: spare-parts marketplace for Zimbabwe
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A mobile app (iOS and Android, built with Expo) where drivers in Zimbabwe find vehicle spare parts and mechanics and suppliers compete to supply them. Buyers can browse listings, or post a **request** for a part and receive **bids** from sellers, in the style of ride-hailing apps. Not yet in the app stores: it runs in Expo Go, and a waitlist page is at [pagaraji-landing](https://github.com/tadiwachirambamhanda-cyber/pagaraji-landing).
 
-## Get started
+## What it does
+- **Listings and requests:** sellers list parts with photos; buyers post what they need, and sellers can place and counter offers with live-updating bids.
+- **Real-time chat** between buyer and seller, with a "needs a response" badge for countered offers.
+- **Map and live location** to find parts and sellers nearby, and share a location in a chat.
+- **Trust:** verified-supplier tags, seller ratings, deal completion, and a manual supplier-verification checklist (`docs/supplier-verification.md`).
+- **Helpers:** vehicle fitment matching, price guidance, flags when an open request matches what a seller already lists, dark mode.
+- **Deals, Selling and Activity tabs** so both sides can follow every offer.
 
-1. Install dependencies
+## Back end
+Supabase (Postgres, Auth, Storage, Realtime) with **26 migrations**, row-level security on the tables, and signed URLs for photos. Phone numbers are normalised for Zimbabwe and UAE formats.
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
+## Run it
 ```bash
-npm run reset-project
+npm install
+npx expo start
 ```
+Create `.env.local` with `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` (the anon key is public by design; access is controlled by row-level security). Run the SQL in `supabase/migrations/` in order on your own Supabase project.
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-### Other setup steps
-
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Stack
+Expo SDK 57, React Native, expo-router, TypeScript, Supabase, react-native-maps. About 12,700 lines of TypeScript.
