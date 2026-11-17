@@ -18,7 +18,7 @@ Supabase (Postgres, Auth, Storage, Realtime) with **26 migrations**, row-level s
 npm install
 npx expo start
 ```
-Create `.env.local` with the Supabase URL and anon key (names are in `src/lib/supabase.ts`). Run the SQL in `supabase/migrations/` in order on your own Supabase project.
+Create `.env.local` with `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` (the anon key is public by design; access is controlled by row-level security). Run the SQL in `supabase/migrations/` in order on your own Supabase project.
 
 ## Stack
 Expo SDK 57, React Native, expo-router, TypeScript, Supabase, react-native-maps. About 12,700 lines of TypeScript.
