@@ -2,6 +2,10 @@
 
 A mobile app (iOS and Android, built with Expo) where drivers in Zimbabwe find vehicle spare parts and mechanics and suppliers compete to supply them. Buyers can browse listings, or post a **request** for a part and receive **bids** from sellers, in the style of ride-hailing apps. Not yet in the app stores: it runs in Expo Go, and a waitlist page is at [pagaraji-landing](https://github.com/tadiwachirambamhanda-cyber/pagaraji-landing).
 
+![PaGaraji screens: welcome, post a request, list a part, become a supplier](docs/screenshots/pagaraji-screens.png)
+
+*Screens from the web build running locally. Signed-in screens (live bids, chat, map) need a phone and real accounts, so they are not shown.*
+
 ## What it does
 - **Listings and requests:** sellers list parts with photos; buyers post what they need, and sellers can place and counter offers with live-updating bids.
 - **Real-time chat** between buyer and seller, with a "needs a response" badge for countered offers.
